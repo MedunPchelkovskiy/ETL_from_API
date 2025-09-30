@@ -1,4 +1,4 @@
-#!/home/medun/Projects/Data_warehouse_and_ETL/ETL_from_API/.venv/bin/python3
+#!/home/medun/Projects/Data_warehouse_and_ETL/ETL_from_API/.venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys

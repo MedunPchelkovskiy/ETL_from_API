@@ -1,3 +1,5 @@
+import re
+
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -26,8 +28,8 @@ def extract_data_from_meteoblue_api(city: str) -> pd.DataFrame:
 
     data = {
         "city": [city.capitalize()],
-        "time": [current_time],
-        "temperature": [current_temperature]
+        "curr_time": [current_time],
+        "temperature": re.findall(r'\d+', current_temperature)[0]
     }
 
     df = pd.DataFrame(data)
