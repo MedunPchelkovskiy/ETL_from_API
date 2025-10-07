@@ -109,7 +109,7 @@ def extract_data_from_accuweather_api():
         "temperature": re.findall(r'\d+', current_temperature)[0],
         "weather": [current_weather],
         # "wind": [current_wind_speed],
-        "wind_km_h": re.findall(r'\d+', current_wind_speed)[0],
+        "wind_m_s": re.findall(r'\d+', current_wind_speed)[0],
     }
 
     df = pd.DataFrame(data)
