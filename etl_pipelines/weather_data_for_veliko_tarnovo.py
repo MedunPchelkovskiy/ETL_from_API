@@ -7,9 +7,9 @@ from transform.meteoblue_data_transformation import meteoblue_transformation
 from transform.sinoptik_data_transformation import sinoptik_transformation
 
 if __name__ == "__main__":
-    meteoblue_data = extract_data_from_meteoblue_api("veliko tarnovo")
-    sinoptik_data = extract_data_from_sinoptik_api()
-    accuweather_data = extract_data_from_accuweather_api()
+    meteoblue_data = extract_data_from_meteoblue_api("https://www.meteoblue.com/en/weather/today/veliko-tarnovo_bulgaria_725993")
+    sinoptik_data = extract_data_from_sinoptik_api("https://www.sinoptik.bg/veliko-turnovo-bulgaria-100725993")
+    accuweather_data = extract_data_from_accuweather_api("https://www.accuweather.com/bg/bg/veliko-tarnovo/46650/current-weather/46650")
 
 
     transformed_accuweather_data = accuweather_transformation(accuweather_data)

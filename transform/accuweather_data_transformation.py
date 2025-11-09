@@ -14,7 +14,8 @@ def accuweather_transformation(df: pd.DataFrame):
     accuweather_df[['weekday', 'curr_day', 'curr_month']] = df['curr_day'].apply(lambda x: pd.Series(split_date(x)))
     accuweather_df['city'] = df['city'].str.split(',').str[0]
     accuweather_df["temperature"] = df["temperature"].astype("int64")
-    accuweather_df["wind_m_s"] = math.floor(int(df["wind_km_h"]) * 0.2777)
+    accuweather_df["wind_m_s"] = math.floor(int(df["wind_km_h"].iloc[0]) * 0.2777)
+
     accuweather_df.drop(columns=["wind_km_h"], inplace=True)
 
     accuweather_df = validate_output_accuweather_data(accuweather_df)
