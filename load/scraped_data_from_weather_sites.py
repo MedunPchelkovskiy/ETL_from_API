@@ -1,7 +1,8 @@
-from sqlalchemy import create_engine
 from decouple import config
+from sqlalchemy import create_engine
 
-def load_data(df, table_name):
+
+def load_scraped_data(df, table_name):
     # Database credentials (replace with actual values)
     username = config("DB_USER")
     password = config("DB_PASSWORD")
@@ -15,6 +16,6 @@ def load_data(df, table_name):
     # Create an engine to manage the connection to the PostgreSQL database
     engine = create_engine(connection_string)
 
-    # Load the DataFrame into the PostgreSQL table (Replace existing table if exists)
+    # Load the DataFrame into the PostgresSQL table (Replace existing table if exists)
     df.to_sql(table_name, engine, if_exists='append', index=False)
-    print(f"Data loaded into {table_name} table in PostgreSQL successfully!")
+    print(f"Data loaded into {table_name} table in PostgresSQL successfully!")
