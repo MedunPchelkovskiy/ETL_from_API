@@ -6,10 +6,13 @@ from decouple import config
 def get_foreca_location_id_from_place_name(place_name):
     url = f"https://pfa.foreca.com/api/v1/location/search/{place_name}?lang=es&token={config("FORECA_API_KEY")}"
     response = requests.get(url)
-    data = response.json()
-    if data.get("locations"):
-        return data["locations"][0]["id"]
-    return None
+    if response.status_code != 200:
+        raise Exception(f"Request failed with status code: {response.status_code}")
+    else:
+        data = response.json()
+        if data.get("locations"):
+          return data["locations"][0]["id"]
+        return None
 
 
 """

@@ -2,7 +2,7 @@ import re
 
 import pandas as pd
 
-from helpers.api_request import api_request_func
+from helpers.extraction_helpers.api_request import api_request_func
 
 
 def scrape_data_from_meteoblue_site(url: str) -> pd.DataFrame:

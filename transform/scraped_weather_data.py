@@ -2,7 +2,7 @@ import math
 
 import pandas as pd
 
-from helpers.transformation import split_date
+from helpers.transformation_helpers.transformation import split_date
 from validation.accuweather_input_data_validation import validate_input_accuweather_data
 from validation.accuweather_output_data_validation import validate_output_accuweather_data
 from validation.meteoblue_input_data_validation import validate_meteoblue_input_data
