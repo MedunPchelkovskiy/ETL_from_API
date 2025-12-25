@@ -50,46 +50,59 @@ def get_open_meteo_data(coordinates: str):
 
 
 if __name__ == "__main__":
-    places = {"Bansko":"41.77,23.43", "Pamporovo":"41.65,24.69", "Borovets":"42.27,23.60"}
-    # print(get_foreca_data(place="Bansko"))
-    # print(get_foreca_data(place="Pamporovo"))
-    # print(get_foreca_data(place="Borovets"))
+    places_with_gps = {"Bansko":"41.77,23.43", "Pamporovo":"41.65,24.69", "Borovets":"42.27,23.60"}
+    print(get_foreca_data("Bansko"))
+    print(get_foreca_data("Pamporovo"))
+    print(get_foreca_data("Borovets"))
+
+    places = ["Bansko", "Pamporovo", "Borovets"]
+
+    for place in places:
+        try:
+            result = get_accuweather_data(place)
+            print(result)
+        except ValueError as e:
+            print(f"Skipping {place}: {e}")
     # print(get_accuweather_data("Bansko"))
     # print(get_accuweather_data("Pamporovo"))
     # print(get_accuweather_data("Borovets"))
-    # print(get_meteoblue_data("Bansko","Bulgaria"))
-    # print(get_meteoblue_data("Pamporovo","Bulgaria"))
-    # print(get_meteoblue_data("Borovets","Bulgaria"))
-    # print(get_weatherbit_data(2770,"BG"))
-    # print(get_weatherbit_data(4870,"BG"))
-    # print(get_weatherbit_data(2010,"BG"))
-    # print(get_tomorrow_data("Bansko"))
-    # print(get_tomorrow_data("Pamporovo"))
-    # print(get_tomorrow_data("Borovets"))
-    # print(get_openweathermap_data("Bansko", "BG"))
-    # print(get_openweathermap_data("Pamporovo", "BG"))
-    # print(get_openweathermap_data("Borovets", "BG"))
 
 
-    # result = get_weatherapi_data(places["Bansko"])
-    # result = json.dumps(result, indent=4)
-    # print(result)
+    print(get_meteoblue_data("Bansko","Bulgaria"))
+    print(get_meteoblue_data("Pamporovo","Bulgaria"))
+    print(get_meteoblue_data("Borovets","Bulgaria"))
+
+    print(get_weatherbit_data(2770,"BG"))
+    print(get_weatherbit_data(4870,"BG"))
+    print(get_weatherbit_data(2010,"BG"))
+
+    print(get_tomorrow_data("Bansko"))
+    print(get_tomorrow_data("Pamporovo"))
+    print(get_tomorrow_data("Borovets"))
+
+    print(get_openweathermap_data("Bansko", "BG"))
+    print(get_openweathermap_data("Pamporovo", "BG"))
+    print(get_openweathermap_data("Borovets", "BG"))
 
 
-    # print(get_weatherapi_data(places["Bansko"]))
-    # print(get_weatherapi_data(places["Pamporovo"]))
-    # print(get_weatherapi_data(places["Borovets"]))
+
+    print(get_weatherapi_data(places_with_gps["Bansko"]))
+    print(get_weatherapi_data(places_with_gps["Pamporovo"]))
+    print(get_weatherapi_data(places_with_gps["Borovets"]))
 
 
-    result = get_open_meteo_data(places["Bansko"])
+
+
+    result = get_open_meteo_data(places_with_gps["Bansko"])
     result = json.dumps(result, indent=4)
     print(result)
-    result = get_open_meteo_data(places["Pamporovo"])
+    result = get_open_meteo_data(places_with_gps["Pamporovo"])
     result = json.dumps(result, indent=4)
     print(result)
-    result = get_open_meteo_data(places["Borovets"])
+    result = get_open_meteo_data(places_with_gps["Borovets"])
     result = json.dumps(result, indent=4)
     print(result)
+
     # print(get_open_meteo_data(places["Bansko"]))
-    # print(get_weatherapi_data(places["Pamporovo"]))
-    # print(get_weatherapi_data(places["Borovets"]))
+    # print(get_open_meteo_data(places["Pamporovo"]))
+    # print(get_open_meteo_data(places["Borovets"]))
