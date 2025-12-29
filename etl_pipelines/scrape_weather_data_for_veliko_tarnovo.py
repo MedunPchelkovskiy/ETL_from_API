@@ -1,7 +1,7 @@
 from extract.scrape_data_from_weather_sites import scrape_data_from_meteoblue_site, \
                                                    scrape_data_from_sinoptik_site, \
                                                    scrape_data_from_accuweather_site
-from load.scraped_data_from_weather_sites import load_scraped_data
+from load.load_scraped_data_from_weather_sites import load_scraped_data
 from transform.scraped_weather_data import accuweather_transformation
 from transform.scraped_weather_data import meteoblue_transformation
 from transform.scraped_weather_data import sinoptik_transformation

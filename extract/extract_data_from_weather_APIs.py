@@ -75,10 +75,10 @@ def extract_data_from_openweathermap_api(place_name, iso_country_code):
     return response.json()
 
 
-def extract_data_from_weatherapi_api(coordinates):
-    lat, lon = coordinates.split(",")
-    lat = float(lat)
-    lon = float(lon)
+def extract_data_from_weatherapi_api(lat, lon):
+    # lat, lon = coordinates.split(",")
+    # lat = float(lat)
+    # lon = float(lon)
     # lat, lon = get_wa_lat_lon_from_place_name(place_name)
     # url = f"http://api.weatherapi.com/v1/forecast.json?key={config('WEATHERAPI_API_KEY')}&q={lat},{lon}&days=7&aqi=no&alerts=no"
     url = f"http://api.weatherapi.com/v1/forecast.json?key={config('WEATHERAPI_API_KEY')}&q={lat},{lon}&days=7&aqi=no&alerts=no&pollen=no&tides=no"
@@ -86,10 +86,8 @@ def extract_data_from_weatherapi_api(coordinates):
     return response.json()
 
 
-def extract_data_from_open_meteo_api(coordinates):
-    lat, lon = coordinates.split(",")
-    lat = float(lat)
-    lon = float(lon)
+def extract_data_from_open_meteo_api(lat, lon):
+
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,rain_sum,windspeed_10m_max,cloudcover_mean,weathercode&forecast_days=7&timezone=UTC"
     response = requests.get(url)
     return response.json()
