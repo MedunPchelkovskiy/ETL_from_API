@@ -1,7 +1,7 @@
 from extract.scrape_data_from_weather_sites import scrape_data_from_meteoblue_site, \
                                                    scrape_data_from_sinoptik_site, \
                                                    scrape_data_from_accuweather_site
-from load.load_scraped_data_from_weather_sites import load_scraped_data
+from load.load_scrape_data_to_local_postgres import load_scrape_data_to_postgres_local
 from transform.scraped_weather_data import accuweather_transformation
 from transform.scraped_weather_data import meteoblue_transformation
 from transform.scraped_weather_data import sinoptik_transformation
@@ -17,9 +17,9 @@ if __name__ == "__main__":
     transformed_meteoblue_data = meteoblue_transformation(meteoblue_data)
 
 
-    load_scraped_data(transformed_meteoblue_data, "meteoblue_data")
-    load_scraped_data(transformed_sinoptik_data, "sinoptik_data")
-    load_scraped_data(transformed_accuweather_data, "accuweather_data")
+    load_scrape_data_to_postgres_local(transformed_meteoblue_data, "meteoblue_data")
+    load_scrape_data_to_postgres_local(transformed_sinoptik_data, "sinoptik_data")
+    load_scrape_data_to_postgres_local(transformed_accuweather_data, "accuweather_data")
 
     print(meteoblue_data)
     print(sinoptik_data)

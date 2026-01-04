@@ -8,7 +8,9 @@ from extract.extract_data_from_weather_APIs import extract_data_from_foreca_api,
     extract_data_from_openweathermap_api, extract_data_from_weatherapi_api, extract_data_from_open_meteo_api
 from helpers.extraction_helpers.get_accuweather_location_id import get_accuweather_location_id_from_place_name
 from helpers.extraction_helpers.get_foreca_location_id import get_foreca_location_id_from_place_name
-from load.load_extracted_data_from_weather_APIs import upload_json
+from load.load_raw_data_from_weather_APIs_to_local_postgres import load_raw_api_data_to_postgres
+from load.load_raw_data_from_weather_APIs_to_Azure import upload_json
+
 
 
 # --------------------------
@@ -108,9 +110,9 @@ api_locations = {
         ("Borovets", "Borovets"),
     ],
     "meteoblue": [
-        ("Bansko", ("Bansko","Bulgaria")),
-        ("Pamporovo", ("Pamporovo","Bulgaria")),
-        ("Borovets", ("Borovets","Bulgaria")),
+        ("Bansko", ("Bansko", "Bulgaria")),
+        ("Pamporovo", ("Pamporovo", "Bulgaria")),
+        ("Borovets", ("Borovets", "Bulgaria")),
     ],
     "weatherbit": [
         ("Bansko", (2770, "BG")),
@@ -128,16 +130,21 @@ api_locations = {
         ("Borovets_BG", ("Borovets", "BG")),
     ],
     "weatherapi": [
-        ("Bansko", (41.77,23.43)),
-        ("Pamporovo", (41.65,24.69)),
-        ("Borovets", (42.27,23.60)),
+        ("Bansko", (41.77, 23.43)),
+        ("Pamporovo", (41.65, 24.69)),
+        ("Borovets", (42.27, 23.60)),
     ],
     "open_meteo": [
-        ("Bansko", (41.77,23.43)),
-        ("Pamporovo", (41.65,24.69)),
-        ("Borovets", (42.27,23.60)),
+        ("Bansko", (41.77, 23.43)),
+        ("Pamporovo", (41.65, 24.69)),
+        ("Borovets", (42.27, 23.60)),
     ],
 }
+
+
+def load_raw_api_data_to_postgres_local(data):
+    load_raw_api_data_to_postgres(data)
+
 
 if __name__ == "__main__":
 
@@ -152,8 +159,10 @@ if __name__ == "__main__":
             folder_name = f"{date_str}_{api_name}_{label}"
             file_name = f"{hour_str}.json"
 
-            # Upload JSON
+            # Upload JSON to Azure
             upload_json(fs_client, config("BASE_DIR"), folder_name, file_name, data["data"])
+            # Upload JSON local to postgres
+            load_raw_api_data_to_postgres_local(data)
 
     # for api_name, locations in api_locations.items():
     #     for place_name in locations:
