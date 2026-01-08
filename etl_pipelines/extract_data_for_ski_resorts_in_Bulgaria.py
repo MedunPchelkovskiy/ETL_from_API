@@ -1,7 +1,7 @@
-import time
 from datetime import datetime
 
 from decouple import config  # import configuration
+from prefect import flow, task
 
 from authentication.azure_auth import get_datalake_client
 from extract.extract_data_from_weather_APIs import extract_data_from_foreca_api, extract_data_from_accuweather_api, \
@@ -11,7 +11,6 @@ from helpers.extraction_helpers.get_accuweather_location_id import get_accuweath
 from helpers.extraction_helpers.get_foreca_location_id import get_foreca_location_id_from_place_name
 from load.load_raw_data_from_weather_APIs_to_Azure import upload_json
 from load.load_raw_data_from_weather_APIs_to_local_postgres import load_raw_api_data_to_postgres
-
 
 # --------------------------
 # Separate functions for each API
@@ -26,6 +25,9 @@ from load.load_raw_data_from_weather_APIs_to_local_postgres import load_raw_api_
 
 INTERVAL = 3600
 
+
+# @task(task_run_name=lambda place_name: f"foreca-{place_name}")
+@task(task_run_name=lambda **kwargs: f"foreca-{kwargs['place_name']}")
 def get_foreca_data(place_name: str):
     api = "foreca_api"
     location_id = get_foreca_location_id_from_place_name(place_name)
@@ -33,6 +35,8 @@ def get_foreca_data(place_name: str):
     return {"api": api, "data": foreca_data}
 
 
+# @task(task_run_name=lambda place_name: f"accuweather-{place_name}")
+@task(task_run_name=lambda **kwargs: f"accuweather-{kwargs['place_name']}")
 def get_accuweather_data(place_name: str):
     api = "accuweather_api"
     location_key = get_accuweather_location_id_from_place_name(place_name)
@@ -40,36 +44,48 @@ def get_accuweather_data(place_name: str):
     return {"api": api, "data": accuweather_data}
 
 
+# @task(task_run_name=lambda place_name: f"meteoblue-{place_name}")
+@task(task_run_name=lambda **kwargs: f"meteoblue-{kwargs['place_name']}")
 def get_meteoblue_data(place_name: str, country: str):
     api = "meteoblue_api"
     meteoblue_data = get_from_meteoblue_api(place_name, country)
     return {"api": api, "data": meteoblue_data}
 
 
+# @task(task_run_name=lambda place_name: f"weatherbit-{place_name}")
+@task(task_run_name=lambda **kwargs: f"weatherbit-{kwargs['place_name']}")
 def get_weatherbit_data(postal_code: int, iso_country_code: str):
     api = "weatherbit_api"
     weatherbit_data = extract_from_weatherbit_api(postal_code, iso_country_code)
     return {"api": api, "data": weatherbit_data}
 
 
+# @task(task_run_name=lambda place_name: f"tommorow-{place_name}")
+@task(task_run_name=lambda **kwargs: f"tommorow-{kwargs['place_name']}")
 def get_tomorrow_data(place_name: str):
     api = "tomorrow_api"
     tomorrow_data = extract_data_from_tomorrow_api(place_name)
     return {"api": api, "data": tomorrow_data}
 
 
+# @task(task_run_name=lambda place_name: f"openweathermap-{place_name}")
+@task(task_run_name=lambda **kwargs: f"openweathermap-{kwargs['place_name']}")
 def get_openweathermap_data(place_name: str, iso_country_code: str):
     api = "openweathermap_api"
     openweather_data = extract_data_from_openweathermap_api(place_name, iso_country_code)
     return {"api": api, "data": openweather_data}
 
 
+# @task(task_run_name=lambda place_name: f"weatherapi-{place_name}")
+@task(task_run_name=lambda **kwargs: f"weatherapi-{kwargs['place_name']}")
 def get_weatherapi_data(lat, lan):
     api = "weatherapi_api"
     weatherapi_data = extract_data_from_weatherapi_api(lat, lan)
     return {"api": api, "data": weatherapi_data}
 
 
+# @task(task_run_name=lambda place_name: f"open-meteo-{place_name}")
+@task(task_run_name=lambda **kwargs: f"open-meteo-{kwargs['place_name']}")
 def get_open_meteo_data(lat, lan):
     api = "open_meteo_api"
     ope_meteo_data = extract_data_from_open_meteo_api(lat, lan)
@@ -144,10 +160,17 @@ api_locations = {
 }
 
 
+@task(task_run_name=lambda **kwargs: f"upload-{kwargs['folder_name']}")
+def load_raw_api_data_to_azure_blob(fs_client, base_dir, folder_name, file_name, data):
+    upload_json(fs_client, base_dir, folder_name, file_name, data)
+
+
+@task(task_run_name=lambda **kwargs: f"postgres-{kwargs['data']['api']}")
 def load_raw_api_data_to_postgres_local(data):
     load_raw_api_data_to_postgres(data)
 
 
+@flow(flow_run_name="extract_data_for_ski_resorts_in_Bulgaria")
 def flow_run():
     for api_name, locations in api_locations.items():
         api_func = api_functions[api_name]
@@ -161,148 +184,17 @@ def flow_run():
             file_name = f"{hour_str}.json"
 
             # Upload JSON to Azure
-            upload_json(fs_client, config("BASE_DIR"), folder_name, file_name, data["data"])
+            load_raw_api_data_to_azure_blob(fs_client, config("BASE_DIR"), folder_name, file_name, data["data"])
             # Upload JSON local to postgres
             load_raw_api_data_to_postgres_local(data)
     print(f"Running flow at {datetime.now()}")
 
 
 if __name__ == "__main__":
-    next_run = time.time()
-    while True:
-        flow_run()
-        next_run += INTERVAL
-        sleep_time = next_run - time.time()
-        time.sleep(sleep_time)
-
-    # for api_name, locations in api_locations.items():
-    #     api_func = api_functions[api_name]
-    #
-    #     for label, payload in locations:
-    #         # Call API
-    #         data = api_func(payload)
-    #
-    #         # Build human-readable folder/file names
-    #         folder_name = f"{date_str}_{api_name}_{label}"
-    #         file_name = f"{hour_str}.json"
-    #
-    #         # Upload JSON to Azure
-    #         upload_json(fs_client, config("BASE_DIR"), folder_name, file_name, data["data"])
-    #         # Upload JSON local to postgres
-    #         load_raw_api_data_to_postgres_local(data)
-
-    # for api_name, locations in api_locations.items():
-    #     for place_name in locations:
-    #         data = api_functions[api_name](place_name)
-    #         folder_name = f"{date_str}_{api_name}_{place_name}"  # unique folder per API + location
-    #         file_name = f"{hour_str}.json"  # or include minutes if needed
-    #         upload_json(fs_client, config("BASE_DIR"), folder_name, file_name, data["data"])
-
-    # for api_name, api_func in api_functions.items():
-    #     try:
-    #         data = api_func()
-    #         folder_name = f"{date_str}_{api_name}"  # Hybrid folder structure
-    #         file_name = f"{hour_str}.json"
-    #         upload_json(fs_client, config.BASE_DIR, folder_name, file_name, data)
-    #     except Exception as e:
-    #         print(f"❌ Failed to fetch/upload data for {api_name}: {e}")
-
-# def get_foreca_data(place_name: str):
-#     location_id = get_foreca_location_id_from_place_name(place_name)
-#     foreca_data = extract_data_from_foreca_api(location_id)
-#     return foreca_data
-#
-#
-# def get_accuweather_data(place_name: str):
-#     location_key = get_accuweather_location_id_from_place_name(place_name)
-#     accuweather_data = extract_data_from_accuweather_api(location_key)
-#     return accuweather_data
-#
-#
-# def get_meteoblue_data(place_name: str, country: str):
-#     meteoblue_data = get_from_meteoblue_api(place_name, country)
-#     return meteoblue_data
-#
-#
-# def get_weatherbit_data(postal_code: int, iso_country_code: str):
-#     weatherbit_data = extract_from_weatherbit_api(postal_code, iso_country_code)
-#     return weatherbit_data
-#
-#
-# def get_tomorrow_data(place_name: str):
-#     tomorrow_data = extract_data_from_tomorrow_api(place_name)
-#     return tomorrow_data
-#
-#
-# def get_openweathermap_data(place_name: str, iso_country_code: str):
-#     openweather_data = extract_data_from_openweathermap_api(place_name, iso_country_code)
-#     return openweather_data
-#
-#
-# def get_weatherapi_data(coordinates):
-#     weatherapi_data = extract_data_from_weatherapi_api(coordinates)
-#     return weatherapi_data
-#
-#
-# def get_open_meteo_data(coordinates: str):
-#     ope_meteo_data = extract_data_from_open_meteo_api(coordinates)
-#     return ope_meteo_data
-
-
-# if __name__ == "__main__":
-# places_with_gps = {"Bansko":"41.77,23.43", "Pamporovo":"41.65,24.69", "Borovets":"42.27,23.60"}
-# print(get_foreca_data("Bansko"))
-# print(get_foreca_data("Pamporovo"))
-# print(get_foreca_data("Borovets"))
-#
-# places = ["Bansko", "Pamporovo", "Borovets"]
-#
-# for place in places:
-#     try:
-#         result = get_accuweather_data(place)
-#         print(result)
-#     except ValueError as e:
-#         print(f"Skipping {place}: {e}")
-# print(get_accuweather_data("Bansko"))
-# print(get_accuweather_data("Pamporovo"))
-# print(get_accuweather_data("Borovets"))
-
-#
-# print(get_meteoblue_data("Bansko","Bulgaria"))
-# print(get_meteoblue_data("Pamporovo","Bulgaria"))
-# print(get_meteoblue_data("Borovets","Bulgaria"))
-#
-# print(get_weatherbit_data(2770,"BG"))
-# print(get_weatherbit_data(4870,"BG"))
-# print(get_weatherbit_data(2010,"BG"))
-#
-# print(get_tomorrow_data("Bansko"))
-# print(get_tomorrow_data("Pamporovo"))
-# print(get_tomorrow_data("Borovets"))
-#
-# print(get_openweathermap_data("Bansko", "BG"))
-# print(get_openweathermap_data("Pamporovo", "BG"))
-# print(get_openweathermap_data("Borovets", "BG"))
-#
-#
-#
-# print(get_weatherapi_data(places_with_gps["Bansko"]))
-# print(get_weatherapi_data(places_with_gps["Pamporovo"]))
-# print(get_weatherapi_data(places_with_gps["Borovets"]))
-#
-#
-#
-#
-# result = get_open_meteo_data(places_with_gps["Bansko"])
-# result = json.dumps(result, indent=4)
-# print(result)
-# result = get_open_meteo_data(places_with_gps["Pamporovo"])
-# result = json.dumps(result, indent=4)
-# print(result)
-# result = get_open_meteo_data(places_with_gps["Borovets"])
-# result = json.dumps(result, indent=4)
-# print(result)
-
-# print(get_open_meteo_data(places["Bansko"]))
-# print(get_open_meteo_data(places["Pamporovo"]))
-# print(get_open_meteo_data(places["Borovets"]))
+    flow_run()
+    # next_run = time.time()
+    # while True:
+    #     flow_run()
+    #     next_run += INTERVAL
+    #     sleep_time = next_run - time.time()
+    #     time.sleep(sleep_time)
