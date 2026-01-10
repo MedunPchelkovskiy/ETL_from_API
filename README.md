@@ -2,6 +2,9 @@ Raw JSON Data Ingestion on Azure (Portfolio Project)
 
 Project Overview
 This project demonstrates a modern data engineering workflow for ingesting raw JSON data using Azure storage concepts, while navigating real-world Azure subscription policies.
+## Orchestration
+Project uses Prefect 2.x with declarative deployments defined in `prefect.yaml`, following infrastructure-as-code
+principles.
 
 The architecture follows a Bronze–Silver–Gold (BSG) layered approach:
 
