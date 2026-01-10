@@ -13,7 +13,7 @@ from load.raw_data.tasks.load_raw_data import load_raw_api_data_to_azure_blob, l
 
 
 @flow(flow_run_name="extract_data_for_ski_resorts_in_Bulgaria")
-def weather_flow_run():
+def weather_flow_run(debug: bool = False):
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     hour_str = now.strftime("%H")
