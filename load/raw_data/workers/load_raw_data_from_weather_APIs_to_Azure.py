@@ -1,23 +1,67 @@
 import io
 import json
+from azure.core.exceptions import ResourceExistsError
+from prefect import get_run_logger
 
 def upload_json(fs_client, base_dir, folder_name, file_name, data):
     """
     Upload a JSON object to a Data Lake folder.
     Creates the directory if it does not exist.
+    Skips upload if the file already exists.
+    Returns a dict indicating upload result for downstream tasks.
     """
-    directory_client = fs_client.get_directory_client(f"{base_dir}/{folder_name}")
+    logger = get_run_logger()
+    directory_path = f"{base_dir}/{folder_name}"
+    directory_client = fs_client.get_directory_client(directory_path)
+
+    # 1️⃣ Ensure directory exists
     try:
         directory_client.create_directory()
-    except Exception:
-        # Directory may already exist
-        pass
+        logger.info("Directory created", extra={"directory_path": directory_path})
+    except ResourceExistsError:
+        logger.debug("Directory already exists", extra={"directory_path": directory_path})
 
+
+    # 2️⃣ Get file client
+    file_client = directory_client.get_file_client(file_name)
+
+    # 3️⃣ Check if file already exists
+    if file_client.exists():
+        logger.info(
+            "Upload skipped: file already exists",
+            extra={
+                "path": f"{directory_path}/{file_name}",
+                "reason": "already_exists",
+                "uploaded": False
+            }
+        )
+        return {
+            "uploaded": False,
+            "path": f"{directory_path}/{file_name}",
+            "reason": "already_exists"
+        }
+
+    # 4️⃣ Upload file
     json_bytes = json.dumps(data).encode("utf-8")
     json_stream = io.BytesIO(json_bytes)
 
-    file_client = directory_client.create_file(file_name)
+    file_client.create_file()
     file_client.append_data(data=json_stream, offset=0, length=len(json_bytes))
     file_client.flush_data(len(json_bytes))
+
+    logger.info(
+        "Upload completed",
+        extra={
+            "path": f"{directory_path}/{file_name}",
+            "reason": "created",
+            "uploaded": True
+        }
+    )
+
+    return {
+        "uploaded": True,
+        "path": f"{directory_path}/{file_name}",
+        "reason": "created"
+    }
 
     print(f"✅ Uploaded {file_name} to folder {folder_name}")

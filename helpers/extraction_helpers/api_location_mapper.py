@@ -9,11 +9,6 @@ api_locations = {
         ("Pamporovo", ("Pamporovo", "Bulgaria")),
         ("Borovets", ("Borovets", "Bulgaria")),
     ],
-    "weatherbit": [
-        ("Bansko", (2770, "BG")),
-        ("Pamporovo", (4870, "BG")),
-        ("Borovets", (2010, "BG")),
-    ],
     "tomorrow": [
         ("Bansko", "Bansko"),
         ("Pamporovo", "Pamporovo"),

@@ -49,50 +49,40 @@ def get_from_meteoblue_api(place_name, country):
     return response.json()
 
 
-def extract_from_weatherbit_api(postal_code, iso_country_code):
-    """
-    Returns Weatherbit forecast JSON for a location.
-    Skips if lat/lon lookup fails or API rate limit (429) occurs.
-    """
-    lat_lon = get_lat_lon_from_postal_code_iso_country_code(postal_code, iso_country_code)
-    if lat_lon is None:
-        print(f"[{datetime.now()}] Skipping {postal_code}/{iso_country_code} due to failed lat/lon lookup")
-        return None
-
-    lat, lon = lat_lon
-
-    try:
-        url = (
-            f"https://api.weatherbit.io/v2.0/forecast/daily?"
-            f"lat={lat}&lon={lon}&key={config('WEATHERBIT_API_KEY')}&hours=72"
-        )
-        response = requests.get(url)
-
-        if response.status_code == 429:
-            print(f"[{datetime.now()}] Rate limit hit for {postal_code}/{iso_country_code}. Skipping.")
-            return None
-
-        if response.status_code != 200:
-            print(f"[{datetime.now()}] Request failed: {response.status_code} - {response.text}. Skipping.")
-            return None
-
-        return response.json()
-
-    except (requests.RequestException, requests.JSONDecodeError) as e:
-        print(f"[{datetime.now()}] Weatherbit request error for {postal_code}/{iso_country_code}: {e}. Skipping.")
-        return None
-
-
 # def extract_from_weatherbit_api(postal_code, iso_country_code):
+#     """
+#     Returns Weatherbit forecast JSON for a location.
+#     Skips if lat/lon lookup fails or API rate limit (429) occurs.
+#     """
+#     lat_lon = get_lat_lon_from_postal_code_iso_country_code(postal_code, iso_country_code)
+#     if lat_lon is None:
+#         print(f"[{datetime.now()}] Skipping {postal_code}/{iso_country_code} due to failed lat/lon lookup")
+#         return None
+#
+#     lat, lon = lat_lon
+#
 #     try:
-#         lat, lon = get_lat_lon_from_postal_code_iso_country_code(postal_code, iso_country_code)
-#         url = f"https://api.weatherbit.io/v2.0/forecast/daily?lat={lat}&lon={lon}&key={config('WEATHERBIT_API_KEY')}&hours=72"
+#         url = (
+#             f"https://api.weatherbit.io/v2.0/forecast/daily?"
+#             f"lat={lat}&lon={lon}&key={config('WEATHERBIT_API_KEY')}&hours=72"
+#         )
 #         response = requests.get(url)
+#
+#         if response.status_code == 429:
+#             print(f"[{datetime.now()}] Rate limit hit for {postal_code}/{iso_country_code}. Skipping.")
+#             return None
+#
+#         if response.status_code != 200:
+#             print(f"[{datetime.now()}] Request failed: {response.status_code} - {response.text}. Skipping.")
+#             return None
+#
 #         return response.json()
+#
 #     except (requests.RequestException, requests.JSONDecodeError) as e:
-#         print(f"Attempt failed: {e}")
-#         # time.sleep(3600)  # wait a bit before retry
-#     return None
+#         print(f"[{datetime.now()}] Weatherbit request error for {postal_code}/{iso_country_code}: {e}. Skipping.")
+#         return None
+
+
 
 
 def extract_data_from_tomorrow_api(place_name):
@@ -115,11 +105,6 @@ def extract_data_from_openweathermap_api(place_name, iso_country_code):
 
 
 def extract_data_from_weatherapi_api(lat, lon):
-    # lat, lon = coordinates.split(",")
-    # lat = float(lat)
-    # lon = float(lon)
-    # lat, lon = get_wa_lat_lon_from_place_name(place_name)
-    # url = f"http://api.weatherapi.com/v1/forecast.json?key={config('WEATHERAPI_API_KEY')}&q={lat},{lon}&days=7&aqi=no&alerts=no"
     url = f"http://api.weatherapi.com/v1/forecast.json?key={config('WEATHERAPI_API_KEY')}&q={lat},{lon}&days=7&aqi=no&alerts=no&pollen=no&tides=no"
     response = requests.get(url)
     return response.json()
