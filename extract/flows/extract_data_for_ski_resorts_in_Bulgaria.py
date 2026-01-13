@@ -49,9 +49,3 @@ def weather_flow_run(debug: bool = False):
 
 if __name__ == "__main__":
     weather_flow_run()
-    # next_run = time.time()
-    # while True:
-    #     weather_flow_run()
-    #     next_run += INTERVAL
-    #     sleep_time = next_run - time.time()
-    #     time.sleep(sleep_time)

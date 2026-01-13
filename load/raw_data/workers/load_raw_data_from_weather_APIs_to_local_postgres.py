@@ -2,8 +2,13 @@ from datetime import datetime
 
 import psycopg
 from decouple import config
-from prefect import get_run_logger
 from psycopg.types.json import Json
+
+from logging_config import setup_logging
+from logs.combine_loggers_helper import get_logger
+
+setup_logging()
+logger = get_logger()
 
 
 def load_raw_api_data_to_postgres(data, label):
@@ -12,7 +17,6 @@ def load_raw_api_data_to_postgres(data, label):
     Skips insertion if the same record already exists (idempotent).
     Returns a dict indicating upload result.
     """
-    logger = get_run_logger()
 
     # DB config
     username = config("DB_USER")
