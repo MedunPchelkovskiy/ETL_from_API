@@ -6,6 +6,7 @@ from prefect import flow
 from clients.datalake_client import fs_client
 from helpers.extraction_helpers.api_tasks_mapper import api_tasks
 from helpers.extraction_helpers.api_location_mapper import api_locations
+from helpers.observability_helper.metrics_server import start_metrics_server
 from load.raw_data.tasks.load_raw_data import load_raw_api_data_to_azure_blob, load_raw_api_data_to_postgres_local
 
 
@@ -47,5 +48,9 @@ def weather_flow_run(debug: bool = False):
     print(f"Running flow at {datetime.now()}")
 
 
-if __name__ == "__main__":
+def main_flow():    #after adding transform->load flow, make main_flows_runner.py and move this function there, to start all flows
+    start_metrics_server()
     weather_flow_run()
+
+if __name__ == "__main__":
+    main_flow()

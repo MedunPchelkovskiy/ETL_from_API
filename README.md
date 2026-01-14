@@ -1,6 +1,8 @@
 Raw JSON Data Ingestion on Azure (Portfolio Project)
 
 Project Overview
+Designed and implemented a containerized data ingestion platform using Prefect for orchestration, ingesting data from multiple external APIs, validating and processing it, and storing it in Postgres and Azure Blob Storage.
+Implemented structured logging, metrics, and centralized observability using Prometheus, Loki, and Grafana.
 This project demonstrates a modern data engineering workflow for ingesting raw JSON data using Azure storage concepts, while navigating real-world Azure subscription policies.
 ## Orchestration
 Project uses Prefect 2.x with declarative deployments defined in `prefect.yaml`, following infrastructure-as-code
