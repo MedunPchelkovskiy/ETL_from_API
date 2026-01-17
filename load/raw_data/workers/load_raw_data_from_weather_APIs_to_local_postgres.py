@@ -36,7 +36,7 @@ def load_raw_api_data_to_postgres(data, label):
     try:
         with psycopg.connect(connection_string) as conn:
             with conn.cursor() as cur:
-                # Example: INSERT ... ON CONFLICT DO NOTHING
+                # INSERT ... ON CONFLICT DO NOTHING
                 cur.execute(
                     """
                     INSERT INTO raw_json_weather_api_data
@@ -52,15 +52,47 @@ def load_raw_api_data_to_postgres(data, label):
 
         if inserted_rows == 0:
             logger.info(
-                f"Postgres insert skipped: record already exists | source={source}"
+                "Postgres insert skipped: record already exists | source= %s - place_name= %s - ingest_date= %s - ingest_hour= %s",
+                source,
+                place_name,
+                ingest_date,
+                ingest_hour,
+                extra={
+                    "storage": "postgres DB",
+                    "path": f"{config("DB_NAME_FOR_RAW_WEATHER_API_DATA")}/{source}/{place_name}/{ingest_date}/{ingest_hour}",
+                    "reason": "exist",
+                    "inserted": False,
+                }
             )
             return {"inserted": False, "source": source, "reason": "already_exists"}
         else:
             logger.info(
-                f"Data loaded into Postgres successfully | source={source}"
+                "Data loaded into Postgres successfully | source=%s/place_name=%s/ingest_date=%s/ingest_hour=%s",
+                source,
+                place_name,
+                ingest_date,
+                ingest_hour,
+                extra={
+                    "storage": "postgres DB",
+                    "path": f"{config("DB_NAME_FOR_RAW_WEATHER_API_DATA")}/{source}/{place_name}/{ingest_date}/{ingest_hour}",
+                    "result": "inserted",
+                    "inserted": True,
+                }
             )
-            return {"inserted": True, "source": source, "reason": "inserted"}
+            return {"inserted": True, "source": source, "result": "inserted"}
 
     except Exception as e:
-        logger.error(f"Postgres load failed | source={source} | error={e}")
+        logger.error("Postgres load failed | source=%s/place_name=%s/ingest_date=%s/ingest_hour=%s",
+                     source,
+                     place_name,
+                     ingest_date,
+                     ingest_hour,
+                     exc_info=True,
+                     extra={
+                         "storage": "postgres DB",
+                         "path": f"{config("DB_NAME_FOR_RAW_WEATHER_API_DATA")}/{source}/{place_name}/{ingest_date}/{ingest_hour}",
+                         "result": "failed",
+                         "inserted": False,
+                     }
+                     )
         raise

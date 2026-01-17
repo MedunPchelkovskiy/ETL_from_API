@@ -4,16 +4,18 @@ from decouple import config  # import configuration
 from prefect import flow
 
 from clients.datalake_client import fs_client
-from helpers.extraction_helpers.api_tasks_mapper import api_tasks
 from helpers.extraction_helpers.api_location_mapper import api_locations
+from helpers.extraction_helpers.api_tasks_mapper import api_tasks
 from helpers.observability_helper.metrics_server import start_metrics_server
 from load.raw_data.tasks.load_raw_data import load_raw_api_data_to_azure_blob, load_raw_api_data_to_postgres_local
+from logging_config import setup_logging
 
 
 # INTERVAL = 3600
 
 @flow(
-    flow_run_name=lambda: f"extract_data_for_ski_resorts_in_Bulgaria - {datetime.now().strftime('%d%m%Y-%H%M%S')}"   # Lambda give dynamically timestamp on every flow execution
+    flow_run_name=lambda: f"extract_data_for_ski_resorts_in_Bulgaria - {datetime.now().strftime('%d%m%Y-%H%M%S')}"
+    # Lambda give dynamically timestamp on every flow execution
 )
 def weather_flow_run(debug: bool = False):
     now = datetime.now()
@@ -28,7 +30,7 @@ def weather_flow_run(debug: bool = False):
             # data = api_task(payload)
             if isinstance(payload, str):
                 payload = (payload,)
-            state = api_task.submit(*payload,return_state=True)
+            state = api_task.submit(*payload, return_state=True)
 
             if state.is_failed():
                 # 🔴 логваш, метрики, алерт и продължаваш
@@ -48,9 +50,11 @@ def weather_flow_run(debug: bool = False):
     print(f"Running flow at {datetime.now()}")
 
 
-def main_flow():    #after adding transform->load flow, make main_flows_runner.py and move this function there, to start all flows
+def main_flow():
+    setup_logging()
     start_metrics_server()
     weather_flow_run()
+
 
 if __name__ == "__main__":
     main_flow()

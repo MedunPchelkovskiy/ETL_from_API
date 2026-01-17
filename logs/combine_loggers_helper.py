@@ -1,12 +1,12 @@
 import logging
-
 from prefect import get_run_logger
-
 
 def get_logger():
     try:
-        logger = get_run_logger()
-        logger._logger.propagate = True
-        return logger
+        # Inside Prefect task
+        return get_run_logger()
     except RuntimeError:
-        return logging.getLogger(__name__)
+        # Outside Prefect, fallback to normal Python logger
+        logger = logging.getLogger(__name__)
+        logger.propagate = True
+        return logger

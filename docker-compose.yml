@@ -1,0 +1,84 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: etl_from_api
+      POSTGRES_USER: postgres-user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - observability
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    networks:
+      - observability
+
+  loki:
+    image: grafana/loki:2.9.3
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./docker/loki-config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    command: "-config.file=/etc/loki/config.yml"
+    networks:
+      - observability
+
+  promtail:
+    image: grafana/promtail:2.9.3
+    volumes:
+      - ./docker/promtail-config.yml:/etc/promtail/config.yml:ro
+      - ./logs:/logs:ro
+    command: "-config.file=/etc/promtail/config.yml"
+    depends_on:
+      - loki
+    networks:
+      - observability
+
+  grafana:
+    image: grafana/grafana:10.2.3
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - observability
+
+
+  prefect-agent:
+    image: prefecthq/prefect:3-python3.11
+    environment:
+      PREFECT_API_URL: http://host.docker.internal:4200  # optional if using local API
+    command: prefect agent start --pool default --name docker-agent
+    networks:
+      - observability
+
+
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  loki_data:
+  grafana_data:
+
+networks:
+  observability:
+    driver: bridge

@@ -9,34 +9,73 @@ from helpers.extraction_helpers.get_accuweather_location_id import get_accuweath
 from helpers.extraction_helpers.get_foreca_location_id import get_foreca_location_id_from_place_name
 from helpers.extraction_helpers.task_exception_logger import call_api_with_logging
 
+from logs.combine_loggers_helper import get_logger
+
 
 @task(retries=3, retry_delay_seconds=20, )
 def get_foreca_data(place_name: str):
+    logger = get_logger()
+    api = "foreca_api"
+    logger.info(
+        "Task extract from api=%s started for place_name=%s",
+        api,
+        place_name,
+    )
     ctx = get_run_context()
     ctx.task_run.name = f"{ctx.task.name} - {place_name}"
-    api = "foreca_api"
+
     location_id = get_foreca_location_id_from_place_name(place_name)
     foreca_data = call_api_with_logging(extract_data_from_foreca_api, location_id, name=place_name)
+
+    logger.info(
+        "Task extract from api=%s completed for place_name=%s",
+        api,
+        place_name,
+    )
     return {"api": api, "data": foreca_data}
 
 
 @task(retries=3, retry_delay_seconds=20, )
 def get_accuweather_data(place_name: str):
+    api = "accuweather_api"
+    logger = get_logger()
+    logger.info(
+        "Task extract from api=%s started for place_name=%s",
+        api,
+        place_name,
+    )
     ctx = get_run_context()
     ctx.task_run.name = f"{ctx.task.name} - {place_name}"
-    api = "accuweather_api"
+
     location_key = get_accuweather_location_id_from_place_name(place_name)
     accuweather_data = call_api_with_logging(extract_data_from_accuweather_api, location_key, name=place_name)
+    logger.info(
+        "Task extract from api=%s completed for place_name=%s",
+        api,
+        place_name,
+    )
 
     return {"api": api, "data": accuweather_data}
 
 
 @task(retries=3, retry_delay_seconds=20, )
 def get_meteoblue_data(place_name: str, country: str):
+    api = "meteoblue_api"
+    logger = get_logger()
+    logger.info(
+        "Task extract from api=%s started for place_name=%s",
+        api,
+        place_name,
+    )
     ctx = get_run_context()
     ctx.task_run.name = f"{ctx.task.name} - {place_name}"
-    api = "meteoblue_api"
+
     meteoblue_data = call_api_with_logging(get_from_meteoblue_api, place_name, country, name=place_name)
+    logger.info(
+        "Task extract from api=%s completed for place_name=%s",
+        api,
+        place_name,
+    )
 
     return {"api": api, "data": meteoblue_data}
 
@@ -53,37 +92,89 @@ def get_meteoblue_data(place_name: str, country: str):
 
 @task(retries=3, retry_delay_seconds=20, )
 def get_tomorrow_data(place_name: str):
+    api = "tomorrow_api"
+    logger = get_logger()
+    logger.info(
+        "Task extract from api=%s started for place_name=%s",
+        api,
+        place_name,
+    )
     ctx = get_run_context()
     ctx.task_run.name = f"{ctx.task.name} - {place_name}"
-    api = "tomorrow_api"
+
     tomorrow_data = call_api_with_logging(extract_data_from_tomorrow_api, place_name, name=place_name)
+
+    logger.info(
+        "Task extract from api=%s completed for place_name=%s",
+        api,
+        place_name,
+    )
 
     return {"api": api, "data": tomorrow_data}
 
 
 @task(retries=3, retry_delay_seconds=20, )
 def get_openweathermap_data(place_name: str, iso_country_code: str):
+    api = "openweathermap_api"
+    logger = get_logger()
+    logger.info(
+        "Task extract from api=%s started for place_name=%s",
+        api,
+        place_name,
+    )
     ctx = get_run_context()
     ctx.task_run.name = f"{ctx.task.name} - {place_name}"
-    api = "openweathermap_api"
+
     openweather_data = call_api_with_logging(extract_data_from_openweathermap_api, place_name, iso_country_code,
                                              name=place_name)
+    logger.info(
+        "Task extract from api=%s completed for place_name=%s",
+        api,
+        place_name,
+    )
     return {"api": api, "data": openweather_data}
 
 
 @task(retries=3, retry_delay_seconds=20, )
 def get_weatherapi_data(lat, lon):
     api = "weatherapi_api"
-    weatherapi_data = call_api_with_logging(extract_data_from_weatherapi_api, lat, lon, name=(lat, lon))
+    logger = get_logger()
+    logger.info(
+        "Task extract from api=%s started for lat=%s | lon=%s",
+        api,
+        lat,
+        lon,
+    )
+
+    weatherapi_data = call_api_with_logging(extract_data_from_weatherapi_api, lat, lon, name=f"{lat:.2f},{lon:.2f}")
     ctx = get_run_context()
     ctx.task_run.name = f"{ctx.task.name} - {weatherapi_data['location']['name']}"
+    logger.info(
+        "Task extract from api=%s completed for lat=%s | lon=%s",
+        api,
+        lat,
+        lon,
+    )
     return {"api": api, "data": weatherapi_data}
 
 
 @task(retries=3, retry_delay_seconds=20, )
 def get_open_meteo_data(lat, lon):
     api = "open_meteo_api"
-    open_meteo_data = call_api_with_logging(extract_data_from_open_meteo_api, lat, lon, name=(lat, lon))
+    logger = get_logger()
+    logger.info(
+        "Task extract from api=%s started for lat=%s | lon=%s",
+        api,
+        lat,
+        lon,
+    )
+    open_meteo_data = call_api_with_logging(extract_data_from_open_meteo_api, lat, lon, name=f"{lat:.2f},{lon:.2f}")
     ctx = get_run_context()
     ctx.task_run.name = f"{ctx.task.name} - {lat:.2f},{lon:.2f}"
+    logger.info(
+        "Task extract from api=%s completed for lat=%s | lon=%s",
+        api,
+        lat,
+        lon,
+    )
     return {"api": api, "data": open_meteo_data}

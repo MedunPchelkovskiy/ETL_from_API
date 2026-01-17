@@ -1,7 +1,15 @@
 import io
 import json
+
 from azure.core.exceptions import ResourceExistsError
-from prefect import get_run_logger
+
+from logging_config import setup_logging
+from logs.combine_loggers_helper import get_logger
+
+setup_logging()
+logger = get_logger()
+
+
 
 def upload_json(fs_client, base_dir, folder_name, file_name, data):
     """
@@ -10,7 +18,6 @@ def upload_json(fs_client, base_dir, folder_name, file_name, data):
     Skips upload if the file already exists.
     Returns a dict indicating upload result for downstream tasks.
     """
-    logger = get_run_logger()
     directory_path = f"{base_dir}/{folder_name}"
     directory_client = fs_client.get_directory_client(directory_path)
 
@@ -21,14 +28,14 @@ def upload_json(fs_client, base_dir, folder_name, file_name, data):
     except ResourceExistsError:
         logger.debug("Directory already exists", extra={"directory_path": directory_path})
 
-
     # 2️⃣ Get file client
     file_client = directory_client.get_file_client(file_name)
 
     # 3️⃣ Check if file already exists
     if file_client.exists():
         logger.info(
-            "Upload skipped: file already exists",
+            "Upload to Azure skipped: file %s already exists",
+            file_name,
             extra={
                 "path": f"{directory_path}/{file_name}",
                 "reason": "already_exists",
@@ -50,11 +57,14 @@ def upload_json(fs_client, base_dir, folder_name, file_name, data):
     file_client.flush_data(len(json_bytes))
 
     logger.info(
-        "Upload completed",
+        "Upload completed: Azure blob storage, file=%s, folder=%s",
+        file_name,
+        directory_path,
         extra={
+            "storage": "azure_blob",
             "path": f"{directory_path}/{file_name}",
-            "reason": "created",
-            "uploaded": True
+            "result": "created",
+            "uploaded": True,
         }
     )
 
@@ -63,5 +73,3 @@ def upload_json(fs_client, base_dir, folder_name, file_name, data):
         "path": f"{directory_path}/{file_name}",
         "reason": "created"
     }
-
-    print(f"✅ Uploaded {file_name} to folder {folder_name}")
