@@ -5,7 +5,7 @@ from decouple import config
 from psycopg.types.json import Json
 
 from logging_config import setup_logging
-from logs.combine_loggers_helper import get_logger
+from helpers.logging_helper.combine_loggers_helper import get_logger
 
 setup_logging()
 logger = get_logger()
@@ -67,7 +67,7 @@ def load_raw_api_data_to_postgres(data, label):
             return {"inserted": False, "source": source, "reason": "already_exists"}
         else:
             logger.info(
-                "Data loaded into Postgres successfully | source=%s/place_name=%s/ingest_date=%s/ingest_hour=%s",
+                "Data loaded into Postgres successfully | source=%s | place_name=%s | ingest_date=%s | ingest_hour=%s",
                 source,
                 place_name,
                 ingest_date,

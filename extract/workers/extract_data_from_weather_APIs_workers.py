@@ -1,38 +1,19 @@
-import time
-from datetime import datetime
-
 import requests
 from decouple import config
 
 from helpers.extraction_helpers.get_meteoblue_location import get_lat_lon_from_place_name
 from helpers.extraction_helpers.get_openweathermap_location import get_owm_lat_lon_from_place_name_iso_country_code
-from helpers.extraction_helpers.get_weatherbit_location import get_lat_lon_from_postal_code_iso_country_code
+from helpers.logging_helper.combine_loggers_helper import get_logger
+from logging_config import setup_logging
+
+setup_logging()
+logger = get_logger()
 
 
-def extract_data_from_foreca_api(location_id: int, max_retries: int = 5):
-    """Function that returns data from foreca api. Max_retries is set to 5. Api have request limit and
-     if you exceed the allowed requests per second, the API responds with a rate limit error instead of valid data."""
-
+def extract_data_from_foreca_api(location_id: int):
     url = f"https://pfa.foreca.com/api/v1/forecast/daily/{location_id}?lang=en&token={config("FORECA_API_KEY")}"
-
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(url)
-
-            if response.status_code == 429:
-                print("Rate limit reached. Retrying in 2 seconds...")
-                time.sleep(2)
-                continue
-
-            response.raise_for_status()  # raise for other HTTP errors
-            return response.json()
-
-        except requests.exceptions.RequestException as e:
-            print(f"Request failed: {e}. Retrying in 2 seconds...")
-            time.sleep(2)
-
-    print(f"Failed to fetch data for place_id {location_id} after {max_retries} attempts.")
-    return None
+    response = requests.get(url)
+    return response.json()
 
 
 def extract_data_from_accuweather_api(location_key: int):
@@ -81,8 +62,6 @@ def get_from_meteoblue_api(place_name, country):
 #     except (requests.RequestException, requests.JSONDecodeError) as e:
 #         print(f"[{datetime.now()}] Weatherbit request error for {postal_code}/{iso_country_code}: {e}. Skipping.")
 #         return None
-
-
 
 
 def extract_data_from_tomorrow_api(place_name):

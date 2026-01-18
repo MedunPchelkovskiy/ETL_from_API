@@ -4,7 +4,7 @@ import json
 from azure.core.exceptions import ResourceExistsError
 
 from logging_config import setup_logging
-from logs.combine_loggers_helper import get_logger
+from helpers.logging_helper.combine_loggers_helper import get_logger
 
 setup_logging()
 logger = get_logger()
@@ -24,9 +24,9 @@ def upload_json(fs_client, base_dir, folder_name, file_name, data):
     # 1️⃣ Ensure directory exists
     try:
         directory_client.create_directory()
-        logger.info("Directory created", extra={"directory_path": directory_path})
+        logger.info("Directory %s created", directory_path, extra={"adls_directory_path": directory_path})
     except ResourceExistsError:
-        logger.debug("Directory already exists", extra={"directory_path": directory_path})
+        logger.debug("Directory %s already exists", directory_path, extra={"adls_directory_path": directory_path})
 
     # 2️⃣ Get file client
     file_client = directory_client.get_file_client(file_name)

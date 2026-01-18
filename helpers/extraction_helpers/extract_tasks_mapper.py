@@ -1,5 +1,5 @@
 # Map API names to their functions
-from extract.tasks.weather_tasks import get_accuweather_data, get_meteoblue_data,    \
+from extract.tasks.weather_data_extraction_tasks import get_accuweather_data, get_meteoblue_data,    \
     get_tomorrow_data, get_openweathermap_data, get_weatherapi_data, get_open_meteo_data
 
 api_tasks = {

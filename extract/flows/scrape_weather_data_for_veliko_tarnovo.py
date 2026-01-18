@@ -1,4 +1,4 @@
-from extract.workers.scrape_data_from_weather_sites import scrape_data_from_meteoblue_site, \
+from extract.workers.scrape_data_from_weather_sites_workers import scrape_data_from_meteoblue_site, \
                                                    scrape_data_from_sinoptik_site, \
                                                    scrape_data_from_accuweather_site
 from load.raw_data.workers.load_scrape_data_to_local_postgres import load_scrape_data_to_postgres_local

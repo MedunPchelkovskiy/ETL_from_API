@@ -1,7 +1,7 @@
 from prefect import task
 from prefect.context import get_run_context
 
-from extract.workers.extract_data_from_weather_APIs import extract_data_from_foreca_api, \
+from extract.workers.extract_data_from_weather_APIs_workers import extract_data_from_foreca_api, \
     extract_data_from_accuweather_api, \
     get_from_meteoblue_api, extract_data_from_tomorrow_api, \
     extract_data_from_openweathermap_api, extract_data_from_weatherapi_api, extract_data_from_open_meteo_api
@@ -9,7 +9,7 @@ from helpers.extraction_helpers.get_accuweather_location_id import get_accuweath
 from helpers.extraction_helpers.get_foreca_location_id import get_foreca_location_id_from_place_name
 from helpers.extraction_helpers.task_exception_logger import call_api_with_logging
 
-from logs.combine_loggers_helper import get_logger
+from helpers.logging_helper.combine_loggers_helper import get_logger
 
 
 @task(retries=3, retry_delay_seconds=20, )

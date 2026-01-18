@@ -5,7 +5,7 @@ from prefect import flow
 
 from clients.datalake_client import fs_client
 from helpers.extraction_helpers.api_location_mapper import api_locations
-from helpers.extraction_helpers.api_tasks_mapper import api_tasks
+from helpers.extraction_helpers.extract_tasks_mapper import api_tasks
 from helpers.observability_helper.metrics_server import start_metrics_server
 from load.raw_data.tasks.load_raw_data import load_raw_api_data_to_azure_blob, load_raw_api_data_to_postgres_local
 from logging_config import setup_logging
