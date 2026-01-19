@@ -2,9 +2,9 @@ from extract.workers.scrape_data_from_weather_sites_workers import scrape_data_f
                                                    scrape_data_from_sinoptik_site, \
                                                    scrape_data_from_accuweather_site
 from load.raw_data.workers.load_scrape_data_to_local_postgres import load_scrape_data_to_postgres_local
-from transform.scraped_weather_data import accuweather_transformation
-from transform.scraped_weather_data import meteoblue_transformation
-from transform.scraped_weather_data import sinoptik_transformation
+from transform.tasks.scraped_weather_data_transformation_tasks import accuweather_transformation
+from transform.tasks.scraped_weather_data_transformation_tasks import meteoblue_transformation
+from transform.tasks.scraped_weather_data_transformation_tasks import sinoptik_transformation
 
 if __name__ == "__main__":
     meteoblue_data = scrape_data_from_meteoblue_site("https://www.meteoblue.com/en/weather/today/veliko-tarnovo_bulgaria_725993")
