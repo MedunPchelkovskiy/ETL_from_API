@@ -4,7 +4,7 @@ name: etl_from_api
 deployments:
   - name: local-dev
     description: Local Prefect deployment
-    entrypoint: extract/flows/extract_data_for_ski_resorts_in_Bulgaria.py:weather_flow_run
+    entrypoint: src.flows.bronze.extract_data_for_ski_resorts_in_Bulgaria:weather_flow_run
     tags: [local, portfolio]
     parameters:
       debug: true
