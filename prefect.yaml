@@ -2,6 +2,15 @@ prefect-version: "3.*"
 name: etl_from_api
 
 deployments:
+    - name: Orchestrator-Deployment
+    entrypoint: src/flows/master/orchestrator_flow.py:orchestrator_flow
+    schedule: # optional, can remove if you want manual runs
+      type: Cron
+      cron: "11 * * * *"
+      timezone: Europe/Sofia
+    work_pool:
+      name: local-dev-process
+
   - name: local-dev
     description: Local Prefect deployment
     entrypoint: src/flows/bronze/extract_data_for_ski_resorts_in_Bulgaria_flow.py:weather_flow_run
