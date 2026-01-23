@@ -4,13 +4,23 @@ name: etl_from_api
 deployments:
   - name: local-dev
     description: Local Prefect deployment
-    entrypoint: src.flows.bronze.extract_data_for_ski_resorts_in_Bulgaria:weather_flow_run
+    entrypoint: src/flows/bronze/extract_data_for_ski_resorts_in_Bulgaria_flow.py:weather_flow_run
     tags: [local, portfolio]
     parameters:
       debug: true
     schedule:
       cron: "13 * * * *"
       timezone: Europe/Sofia
+    concurrency_limit: 1
+    work_pool:
+      name: local-dev-process
+
+  - name: second-flow-dev
+    description: Local Prefect deployment for second flow
+    entrypoint: src/flows/silver/extract_bronze_data_flow.py:transform_bronze_data
+    tags: [ local, portfolio ]
+    parameters:
+      debug: true
     concurrency_limit: 1
     work_pool:
       name: local-dev-process
