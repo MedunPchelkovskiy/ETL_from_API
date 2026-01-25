@@ -1,6 +1,8 @@
 from prefect import flow, runtime
 from prefect.deployments import run_deployment
+
 from src.helpers.logging_helper.combine_loggers_helper import get_logger
+
 
 @flow(name="OrchestratorFlow")
 def orchestrator_flow():
@@ -18,7 +20,7 @@ def orchestrator_flow():
         extra={
             "flow_run_id": runtime.flow_run.id,
             "task_run_id": runtime.task_run.id if runtime.task_run else None,
-            "deployment": "first-flow/FirstFlowDeployment"
+            "deployment": "weather-flow-run/local-dev"
         }
     )
     first_result = run_deployment("weather-flow-run/local-dev")
@@ -27,7 +29,7 @@ def orchestrator_flow():
         extra={
             "flow_run_id": runtime.flow_run.id,
             "task_run_id": runtime.task_run.id if runtime.task_run else None,
-            "deployment": "first-flow/FirstFlowDeployment",
+            "deployment": "weather-flow-run/local-dev",
             "state": first_result.state.type.value
         }
     )

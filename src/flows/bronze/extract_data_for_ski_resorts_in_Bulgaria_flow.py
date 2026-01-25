@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime
 
 from decouple import config  # import configuration
@@ -12,8 +11,6 @@ from src.helpers.bronze.extract_tasks_mapper import api_tasks
 from src.helpers.observability_helper.metrics_server import start_metrics_server
 from src.tasks.bronze.load_raw_weather_data_tasks import load_raw_api_data_to_azure_blob, \
     load_raw_api_data_to_postgres_local
-
-from src.flows.silver.extract_bronze_data_flow import transform_bronze_data
 
 
 # INTERVAL = 3600
@@ -53,16 +50,6 @@ def weather_flow_run(debug: bool = False):
             # Upload JSON local to postgres
             load_raw_api_data_to_postgres_local(data, label)
     print(f"Running flow at {datetime.now()}")
-
-    async def trigger_second_flow():
-        client = get_client()
-        await client.create_flow_run(
-            flow=transform_bronze_data,  # pass the flow function directly
-            parameters={"debug": True}
-        )
-
-    asyncio.run(trigger_second_flow())
-    print("Second flow triggered!")
 
 
 def main_flow():

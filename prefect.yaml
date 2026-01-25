@@ -2,7 +2,7 @@ prefect-version: "3.*"
 name: etl_from_api
 
 deployments:
-    - name: Orchestrator-Deployment
+  - name: Orchestrator-Deployment
     entrypoint: src/flows/master/orchestrator_flow.py:orchestrator_flow
     schedule: # optional, can remove if you want manual runs
       type: Cron
