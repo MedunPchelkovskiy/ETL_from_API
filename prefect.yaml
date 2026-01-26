@@ -24,7 +24,7 @@ deployments:
     work_pool:
       name: local-dev-process
 
-  - name: second-flow-dev
+  - name: silver-flow
     description: Local Prefect deployment for second flow
     entrypoint: src/flows/silver/extract_bronze_data_flow.py:transform_bronze_data
     tags: [ local, portfolio ]

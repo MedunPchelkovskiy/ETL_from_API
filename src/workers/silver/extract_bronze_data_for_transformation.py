@@ -3,23 +3,26 @@ from sqlalchemy.exc import OperationalError
 from src.helpers.logging_helper.combine_loggers_helper import get_logger
 
 
-def extract_bronze_data_from_postgres(conn, date, hour):
+def extract_bronze_data_from_postgres(engine, date, hour):
     """
     Fetch all raw JSON rows for given date/hour.
     DB table can be make dynamic, if needed!!
     """
     logger = get_logger()
-    query = f"""
+    # Parameterized query to prevent SQL injection
+    query = """
         SELECT *
-        FROM raw_json_weather_api_data                
-        WHERE ingest_date = '{date}' 
-          AND ingest_hour >= {hour}
+        FROM raw_json_weather_api_data
+        WHERE ingest_date = %s
+          AND ingest_hour >= %s
         ORDER BY ingest_date DESC, ingest_hour DESC;
     """
+
     try:
-        raw_df = pd.read_sql_query(query, conn)
-        logger.info("Fetching raw JSON data from raw_json_weather_api_data table successfully")
-        return raw_df      # Return data frame with last fresh api calls
+        raw_df = pd.read_sql(query, engine, params=(date, hour))
+        logger.info("Fetched raw JSON data successfully")
+        return raw_df
+
     except OperationalError as e:
         logger.error("Database query failed: %s", e)
         raise

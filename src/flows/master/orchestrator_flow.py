@@ -16,7 +16,7 @@ def orchestrator_flow():
 
     # --- Run first deployment ---
     logger.info(
-        "Starting FirstFlowDeployment...",
+        "Starting First Flow Deployment...",
         extra={
             "flow_run_id": runtime.flow_run.id,
             "task_run_id": runtime.task_run.id if runtime.task_run else None,
@@ -25,7 +25,7 @@ def orchestrator_flow():
     )
     first_result = run_deployment("weather-flow-run/local-dev")
     logger.info(
-        "Completed FirstFlowDeployment",
+        "Completed First Flow Deployment",
         extra={
             "flow_run_id": runtime.flow_run.id,
             "task_run_id": runtime.task_run.id if runtime.task_run else None,
@@ -36,20 +36,20 @@ def orchestrator_flow():
 
     # --- Run second deployment ---
     logger.info(
-        "Starting SecondFlowDeployment...",
+        "Starting Silver Flow Deployment...",
         extra={
             "flow_run_id": runtime.flow_run.id,
             "task_run_id": runtime.task_run.id if runtime.task_run else None,
             "deployment": "transform-bronze-data/SecondFlowDeployment"
         }
     )
-    second_result = run_deployment("transform-bronze-data/SecondFlowDeployment")
+    second_result = run_deployment("transform-bronze-data/silver-flow")
     logger.info(
-        "Completed SecondFlowDeployment",
+        "Completed Silver Flow Deployment",
         extra={
             "flow_run_id": runtime.flow_run.id,
             "task_run_id": runtime.task_run.id if runtime.task_run else None,
-            "deployment": "transform-bronze-data/SecondFlowDeployment",
+            "deployment": "transform-bronze-data/silver-flow",
             "state": second_result.state.type.value
         }
     )
