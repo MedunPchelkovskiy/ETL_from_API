@@ -1,9 +1,10 @@
-from prefect import get_run_logger
-from prefect.exceptions import Abort
 from requests import RequestException
 
+from src.helpers.logging_helper.combine_loggers_helper import get_logger
+
+
 def call_api_with_logging(api_func, *args, name=None, **kwargs):
-    logger = get_run_logger()
+    logger = get_logger()
     display_name = name or "unknown location"
     api_name = api_func.__name__
 
@@ -21,7 +22,7 @@ def call_api_with_logging(api_func, *args, name=None, **kwargs):
                     "result": "empty",
                 }
             )
-            raise Abort(f"Empty response for {display_name}")
+            raise RuntimeError(f"Empty response for {display_name}")
 
     except RequestException as e:
         logger.warning(
@@ -51,7 +52,7 @@ def call_api_with_logging(api_func, *args, name=None, **kwargs):
                 "retryable": False,
             }
         )
-        raise Abort(f"Non-retryable error for {display_name}")
+        raise RuntimeError(f"Non-retryable error for {display_name}")
 
     logger.info(
         "API call succeeded | api=%s | target=%s",

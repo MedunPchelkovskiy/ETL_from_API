@@ -2,7 +2,7 @@ import pandas as pd
 from prefect import task
 
 from src.helpers.logging_helper.combine_loggers_helper import get_logger
-from src.workers.silver.transform_bronze_data import clean_silver_df, validate_silver_df
+from src.workers.silver.transform_bronze_data import clean_silver_df
 
 
 @task
@@ -47,17 +47,17 @@ def clean_silver(df: pd.DataFrame):
     return cleaned_df
 
 
-# Task: validate and clean
-@task
-def validate_silver_data(df: pd.DataFrame):
-    logger = get_logger()
-    logger.info("Task validation of silver df started ...")
-
-    try:
-        validate_silver_df(df)  # raises if invalid
-    except Exception as e:
-        logger.error("Silver DataFrame validation failed: %s", e, exc_info=True)
-        raise  # Let Prefect handle retries/failure
-
-    logger.info("Task validation of silver df completed")
-    return df
+# # Task: validate and clean
+# @task
+# def validate_silver_data(df: pd.DataFrame):
+#     logger = get_logger()
+#     logger.info("Task validation of silver df started ...")
+#
+#     try:
+#         validate_silver_df(df)  # raises if invalid
+#     except Exception as e:
+#         logger.error("Silver DataFrame validation failed: %s", e, exc_info=True)
+#         raise  # Let Prefect handle retries/failure
+#
+#     logger.info("Task validation of silver df completed")
+#     return df

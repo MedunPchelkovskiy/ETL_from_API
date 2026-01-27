@@ -21,14 +21,14 @@ def extract_bronze_data(date, hour):
     # Create engine inside task to avoid Prefect caching issues
     engine = create_engine(config("DB_CONN"))
 
-    data = extract_bronze_data_from_postgres(engine, date, hour)
+    raw_df = extract_bronze_data_from_postgres(engine, date, hour)
 
     logger.info("Completed extract bronze data from Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,
                        "task_run_id": runtime.task_run.id,
                        }
                 )
-    return data
+    return raw_df
 
 
 
