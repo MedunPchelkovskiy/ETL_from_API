@@ -36,7 +36,7 @@ def weather_flow_run(debug: bool = False):
 
             if state.is_failed():
                 # 🔴 логваш, метрики, алерт и продължаваш
-                print(f"❌ Failed for {api_name} - {label}")
+                print(f"❌ Failed for {api_name} - {label}")      #TODO: change print with logger!!!
                 continue
 
             data = state.result()

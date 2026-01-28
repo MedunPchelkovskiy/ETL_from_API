@@ -1,17 +1,20 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import pandas as pd
+from azure.core.exceptions import ResourceNotFoundError
+from decouple import config
 # from decouple import config
 from prefect import flow
 
 from src.helpers.logging_helper.combine_loggers_helper import get_logger
-from src.helpers.silver.parsing_mapper import api_parsers
+from src.helpers.silver.parsing_mapper import api_data_parsers
 from src.helpers.silver.source_naming_mapper import canonical_api_map
-from src.tasks.silver.extract_from_bronze_layer_tasks import extract_bronze_data
+from src.tasks.silver.extract_from_bronze_layer_tasks import extract_bronze_data_from_postgres, \
+    extract_bronze_data_from_azure_blob_task
 from src.tasks.silver.load_to_gold_tasks import load_silver_data_to_postgres_task
-from src.tasks.silver.transform_bronze_data_tasks import parse_api_group, clean_silver
-
+from src.tasks.silver.transform_bronze_data_tasks import parse_api_group, clean_silver, normalize_combine_task
+from src.clients.datalake_client import fs_client
 
 # from sqlalchemy import create_engine
 
@@ -20,18 +23,26 @@ from src.tasks.silver.transform_bronze_data_tasks import parse_api_group, clean_
     flow_run_name=lambda: f"extract_bronze_data_from_local_postgres - {datetime.now().strftime('%d%m%Y-%H%M%S')}"
     # Lambda give dynamically timestamp on every flow execution
 )
-def transform_bronze_data(api_parsing: dict = api_parsers, date: Optional[str] = None,
-                          hour: Optional[int] = None):
+def transform_bronze_data(api_parsers: dict = api_data_parsers,
+                          date: Optional[str] = None,
+                          hour: Optional[int] = None,
+                          base_dir = config("BASE_DIR"),
+                          azure_fs_client = fs_client):
     logger = get_logger()
 
-    now = datetime.now()
-    if date is None:
-        date = now.strftime("%Y-%m-%d")
-    if hour is None:
-        hour = now.hour
+    now = datetime.now(timezone.utc)
+    date, hour = now.strftime("%Y-%m-%d"), now.hour
 
-    # Step 1: fetch bronze
-    bronze_df = extract_bronze_data(date, hour)
+    try:
+        raw_jsons = extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, hour)
+        bronze_df = normalize_combine_task(raw_jsons)
+    except ResourceNotFoundError as e:
+        logger.warning(
+            "Azure file not found, falling back to Postgres | error=%s", e
+        )
+        bronze_df = extract_bronze_data_from_postgres(date, hour)
+
+
 
     silver_parts = []
 
@@ -45,7 +56,7 @@ def transform_bronze_data(api_parsing: dict = api_parsers, date: Optional[str] =
                 "Unknown raw API source, skipping | raw_name=%s", raw_api_name
             )
             api_name = None
-        parsed = parse_api_group(api_name, api_df, api_parsing)
+        parsed = parse_api_group(api_name, api_df, api_parsers)
 
         if parsed is not None and not parsed.empty:
             silver_parts.append(parsed)

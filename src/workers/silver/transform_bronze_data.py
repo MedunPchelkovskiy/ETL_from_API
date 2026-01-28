@@ -3,6 +3,20 @@ import pandas as pd
 from src.helpers.logging_helper.combine_loggers_helper import get_logger
 
 
+def normalize_and_combine(records):
+    dfs = []
+
+    for r in records:
+        df = pd.json_normalize(r["payload"])
+        df["source"] = r["source"]
+        df["place_name"] = r["place_name"]
+        dfs.append(df)
+
+    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+
+
+
+
 def clean_silver_df(df: pd.DataFrame, debug: bool = False) -> pd.DataFrame:
     """
     Full cleaning and validation for silver-level dataframe:

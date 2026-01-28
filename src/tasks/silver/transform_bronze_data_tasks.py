@@ -2,7 +2,15 @@ import pandas as pd
 from prefect import task
 
 from src.helpers.logging_helper.combine_loggers_helper import get_logger
-from src.workers.silver.transform_bronze_data import clean_silver_df
+from src.workers.silver.transform_bronze_data import clean_silver_df, normalize_and_combine
+
+
+@task
+def normalize_combine_task(download_results):
+
+    combined_df = normalize_and_combine(download_results)
+
+    return combined_df
 
 
 @task
@@ -45,7 +53,6 @@ def clean_silver(df: pd.DataFrame):
     )
 
     return cleaned_df
-
 
 # # Task: validate and clean
 # @task
