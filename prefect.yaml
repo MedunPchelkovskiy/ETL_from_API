@@ -11,7 +11,7 @@ deployments:
     work_pool:
       name: local-dev-process
 
-  - name: local-dev
+  - name: bronze
     description: Local Prefect deployment
     entrypoint: src/flows/bronze/extract_data_for_ski_resorts_in_Bulgaria_flow.py:weather_flow_run
     tags: [local, portfolio]

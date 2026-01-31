@@ -3,13 +3,45 @@ import pandas as pd
 from src.helpers.logging_helper.combine_loggers_helper import get_logger
 
 
-def normalize_and_combine(records):
+def normalize_and_combine(records: list[dict], keep_payload: bool = False) -> pd.DataFrame:
+    """
+    Normalize a list of records (from Azure or Postgres) into a flat DataFrame.
+
+    Each record should have:
+        - payload: the original JSON
+        - source: API name
+        - place_name: location name
+        - ingest_date: date of ingestion
+        - ingest_hour: hour of ingestion
+
+    Args:
+        records: list of dicts
+        keep_payload: if True, keep the original JSON in a "payload" column
+
+    Returns:
+        pd.DataFrame: flattened DataFrame ready for silver processing
+    """
     dfs = []
 
     for r in records:
-        df = pd.json_normalize(r["payload"])
-        df["source"] = r["source"]
-        df["place_name"] = r["place_name"]
+        # Skip records with empty payload
+        payload = r.get("payload") or {}
+        if not payload:
+            continue
+
+        # Flatten JSON
+        df = pd.json_normalize(payload)
+
+        # Add standard columns
+        df["source"] = r.get("source")
+        df["place_name"] = r.get("place_name")
+        df["ingest_date"] = r.get("ingest_date")
+        df["ingest_hour"] = r.get("ingest_hour")
+
+        # Optional: preserve raw JSON
+        if keep_payload:
+            df["payload"] = [payload] * len(df)
+
         dfs.append(df)
 
     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()

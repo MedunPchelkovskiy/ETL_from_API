@@ -9,6 +9,7 @@ from prefect import flow
 
 from src.helpers.logging_helper.combine_loggers_helper import get_logger
 from src.helpers.silver.parsing_mapper import api_data_parsers
+from src.helpers.silver.postgres_to_records import postgres_to_records
 from src.helpers.silver.source_naming_mapper import canonical_api_map
 from src.tasks.silver.extract_from_bronze_layer_tasks import extract_bronze_data_from_postgres, \
     extract_bronze_data_from_azure_blob_task
@@ -20,7 +21,7 @@ from src.clients.datalake_client import fs_client
 
 
 @flow(
-    flow_run_name=lambda: f"extract_bronze_data_from_local_postgres - {datetime.now().strftime('%d%m%Y-%H%M%S')}"
+    flow_run_name=lambda: f"Extract bronze data for transformation flow - {datetime.now().strftime('%d%m%Y-%H%M%S')}"
     # Lambda give dynamically timestamp on every flow execution
 )
 def transform_bronze_data(api_parsers: dict = api_data_parsers,
@@ -31,31 +32,43 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
     logger = get_logger()
 
     now = datetime.now(timezone.utc)
-    date, hour = now.strftime("%Y-%m-%d"), now.hour
+
+    date = now.strftime("%Y-%m-%d")  # canonical
+    hour_str = now.strftime("%H")  # Azure
+    hour_int = int(hour_str)  # Postgres
 
     try:
-        raw_jsons = extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, hour)
-        bronze_df = normalize_combine_task(raw_jsons)
+        raw_azure_jsons = extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, hour_str)
+        bronze_df = normalize_combine_task(raw_azure_jsons)
     except ResourceNotFoundError as e:
         logger.warning(
             "Azure file not found, falling back to Postgres | error=%s", e
         )
-        bronze_df = extract_bronze_data_from_postgres(date, hour)
+        raw_postgres_records = extract_bronze_data_from_postgres(date, hour_int)
+        bronze_df = postgres_to_records(raw_postgres_records)
 
 
 
     silver_parts = []
 
     # Step 2: group in-memory
-    for raw_api_name, api_df in bronze_df.groupby("source"):
-        logger.info("Parsing API %s | Rows: %s", raw_api_name, len(api_df))
-        try:
-            api_name = canonical_api_map[raw_api_name]
-        except KeyError:
+    for api_name, api_df in bronze_df.groupby("source"):
+        logger.info("Parsing asd asd API %s | Rows asd asd: %s", api_name, len(api_df))
+
+        # api_name = canonical_api_map.get(raw_api_name)
+
+        if api_name is None:
             logger.warning(
-                "Unknown raw API source, skipping | raw_name=%s", raw_api_name
+                "Unknown raw API name, skipping | raw_name=%s", api_name
             )
-            api_name = None
+            continue
+
+        if api_name not in api_parsers:
+            logger.warning(
+                "No parser registered for API: %s | skipping", api_name
+            )
+            continue
+
         parsed = parse_api_group(api_name, api_df, api_parsers)
 
         if parsed is not None and not parsed.empty:
