@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -7,17 +8,16 @@ from decouple import config
 # from decouple import config
 from prefect import flow
 
+from metrics import FLOW_DURATION, PIPELINE_RUNNING
+from pushgateway_utils import push_metrics_to_gateway
+from src.clients.datalake_client import fs_client
 from src.helpers.logging_helper.combine_loggers_helper import get_logger
 from src.helpers.silver.parsing_mapper import api_data_parsers
 from src.helpers.silver.postgres_to_records import postgres_to_records
-from src.helpers.silver.source_naming_mapper import canonical_api_map
 from src.tasks.silver.extract_from_bronze_layer_tasks import extract_bronze_data_from_postgres, \
     extract_bronze_data_from_azure_blob_task
 from src.tasks.silver.load_to_gold_tasks import load_silver_data_to_postgres_task
 from src.tasks.silver.transform_bronze_data_tasks import parse_api_group, clean_silver, normalize_combine_task
-from src.clients.datalake_client import fs_client
-
-# from sqlalchemy import create_engine
 
 
 @flow(
@@ -27,76 +27,94 @@ from src.clients.datalake_client import fs_client
 def transform_bronze_data(api_parsers: dict = api_data_parsers,
                           date: Optional[str] = None,
                           hour: Optional[int] = None,
-                          base_dir = config("BASE_DIR"),
-                          azure_fs_client = fs_client):
-    logger = get_logger()
-
-    now = datetime.now(timezone.utc)
-
-    date = now.strftime("%Y-%m-%d")  # canonical
-    hour_str = now.strftime("%H")  # Azure
-    hour_int = int(hour_str)  # Postgres
+                          base_dir=config("BASE_DIR"),
+                          azure_fs_client=fs_client):
+    start = time.time()
+    flow_name = "Transform bronze data"
+    PIPELINE_RUNNING.labels(flow_name).set(1)
 
     try:
-        raw_azure_jsons = extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, hour_str)
-        bronze_df = normalize_combine_task(raw_azure_jsons)
-    except ResourceNotFoundError as e:
-        logger.warning(
-            "Azure file not found, falling back to Postgres | error=%s", e
-        )
-        raw_postgres_records = extract_bronze_data_from_postgres(date, hour_int)
-        bronze_df = postgres_to_records(raw_postgres_records)
+        # your current ETL logic
+        ...
+        logger = get_logger()
 
+        now = datetime.now(timezone.utc)
 
+        date = now.strftime("%Y-%m-%d")  # canonical
+        hour_str = now.strftime("%H")  # Azure
+        hour_int = int(hour_str)  # Postgres
 
-    silver_parts = []
-
-    # Step 2: group in-memory
-    for api_name, api_df in bronze_df.groupby("source"):
-        logger.info("Parsing asd asd API %s | Rows asd asd: %s", api_name, len(api_df))
-
-        # api_name = canonical_api_map.get(raw_api_name)
-
-        if api_name is None:
+        try:
+            raw_azure_jsons = extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, hour_str)
+            bronze_df = normalize_combine_task(raw_azure_jsons)
+        except ResourceNotFoundError as e:
             logger.warning(
-                "Unknown raw API name, skipping | raw_name=%s", api_name
+                "Azure file not found, falling back to Postgres | error=%s", e
             )
-            continue
+            raw_postgres_records = extract_bronze_data_from_postgres(date, hour_int)
+            bronze_df = postgres_to_records(raw_postgres_records)
 
-        if api_name not in api_parsers:
-            logger.warning(
-                "No parser registered for API: %s | skipping", api_name
-            )
-            continue
+        silver_parts = []
 
-        parsed = parse_api_group(api_name, api_df, api_parsers)
+        # Step 2: group in-memory
+        for api_name, api_df in bronze_df.groupby("source"):
+            logger.info("Parsing asd asd API %s | Rows asd asd: %s", api_name, len(api_df))
 
-        if parsed is not None and not parsed.empty:
-            silver_parts.append(parsed)
-            logger.info("Parsed rows: %s", len(parsed))
+            # api_name = canonical_api_map.get(raw_api_name)
+
+            if api_name is None:
+                logger.warning(
+                    "Unknown raw API name, skipping | raw_name=%s", api_name
+                )
+                continue
+
+            if api_name not in api_parsers:
+                logger.warning(
+                    "No parser registered for API: %s | skipping", api_name
+                )
+                continue
+
+            parsed = parse_api_group(api_name, api_df, api_parsers)
+
+            if parsed is not None and not parsed.empty:
+                silver_parts.append(parsed)
+                logger.info("Parsed rows: %s", len(parsed))
+            else:
+                logger.warning("Parser returned empty for API: %s", api_name)
+
+        # Step 3: merge all
+        if not silver_parts:
+            logger.warning("No silver data produced from any API")
+            silver_df = pd.DataFrame()
         else:
-            logger.warning("Parser returned empty for API: %s", api_name)
+            silver_df = pd.concat(silver_parts, ignore_index=True)
 
-    # Step 3: merge all
-    if not silver_parts:
-        logger.warning("No silver data produced from any API")
-        silver_df = pd.DataFrame()
-    else:
-        silver_df = pd.concat(silver_parts, ignore_index=True)
+        # Step 4: clean
+        silver_df = clean_silver(silver_df)
 
-    # Step 4: clean
-    silver_df = clean_silver(silver_df)
+        logger.info("Final silver_df preview:\n%s", silver_df.head(301).to_string())
 
-    logger.info("Final silver_df preview:\n%s", silver_df.head(301).to_string())
+        # for i in range(min(5, len(silver_df))):
+        #     logger.info("\nRow %s vertical:\n%s", i, silver_df.iloc[i].to_frame().to_string())
 
-    # for i in range(min(5, len(silver_df))):
-    #     logger.info("\nRow %s vertical:\n%s", i, silver_df.iloc[i].to_frame().to_string())
+        # # Step 5: validate
+        # valid = validate_silver_data(silver_df)
+        #     # Step 6: load
 
-    # # Step 5: validate
-    # valid = validate_silver_data(silver_df)
-    #     # Step 6: load
+        load_silver_data_to_postgres_task(silver_df)
 
-    load_silver_data_to_postgres_task(silver_df)
+        status = "success"
+    except Exception:
+        status = "failed"
+        raise
+    finally:
+        duration = time.time() - start
+        # update FLOW_DURATION and PIPELINE_RUNNING for local use
+        FLOW_DURATION.labels(flow_name).observe(duration)
+        PIPELINE_RUNNING.labels(flow_name).set(0)
+
+        # Push all metrics to Pushgateway
+        push_metrics_to_gateway(flow_name=flow_name, status=status, duration=duration)
 
 
 if __name__ == "__main__":
