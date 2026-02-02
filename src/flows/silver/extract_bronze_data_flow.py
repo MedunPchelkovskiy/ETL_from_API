@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 import pandas as pd
@@ -17,7 +17,7 @@ from src.helpers.silver.parsing_mapper import api_data_parsers
 from src.helpers.silver.postgres_to_records import postgres_to_records
 from src.tasks.silver.extract_from_bronze_layer_tasks import extract_bronze_data_from_postgres, \
     extract_bronze_data_from_azure_blob_task
-from src.tasks.silver.load_to_gold_layer import load_silver_data_to_postgres
+from src.tasks.silver.load_to_gold_layer import load_silver_data_to_postgres, load_silver_data_to_azure
 from src.tasks.silver.transform_bronze_data_tasks import parse_api_group, clean_silver, normalize_combine_task
 
 
@@ -28,7 +28,7 @@ from src.tasks.silver.transform_bronze_data_tasks import parse_api_group, clean_
 def transform_bronze_data(api_parsers: dict = api_data_parsers,
                           date: Optional[str] = None,
                           hour: Optional[int] = None,
-                          base_dir=config("BASE_DIR"),
+                          base_dir=config("BASE_DIR_RAW"),
                           azure_fs_client=fs_client):
     setup_logging()
     logger = get_logger()
@@ -54,7 +54,8 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
                 "Azure file not found, falling back to Postgres | error=%s", e
             )
             raw_postgres_records = extract_bronze_data_from_postgres(date, hour_int)
-            bronze_df = postgres_to_records(raw_postgres_records)
+            records_to_list = postgres_to_records(raw_postgres_records)
+            bronze_df = normalize_combine_task(records_to_list)
 
         silver_parts = []
 
@@ -104,6 +105,7 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
         #     # Step 6: load
 
         load_silver_data_to_postgres(silver_df)
+        load_silver_data_to_azure(silver_df)
 
         status = "success"
     except Exception:

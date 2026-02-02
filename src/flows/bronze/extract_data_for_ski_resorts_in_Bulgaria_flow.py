@@ -49,7 +49,7 @@ def weather_flow_run(debug: bool = False):
             file_name = f"{hour_str}.json"
 
             # Upload JSON to Azure
-            load_raw_api_data_to_azure_blob(fs_client, config("BASE_DIR"), folder_name, file_name, data["data"])
+            load_raw_api_data_to_azure_blob(fs_client, config("BASE_DIR_RAW"), folder_name, file_name, data["data"])
             # Upload JSON local to postgres
             load_raw_api_data_to_postgres_local(data, label)
     print(f"Running flow at {datetime.now()}")
