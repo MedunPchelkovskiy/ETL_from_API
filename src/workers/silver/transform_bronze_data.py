@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
 def normalize_and_combine(records: list[dict], keep_payload: bool = False) -> pd.DataFrame:
@@ -169,7 +169,7 @@ def clean_silver_df(df: pd.DataFrame, debug: bool = False) -> pd.DataFrame:
 
 # import pandas as pd
 #
-# from src.helpers.logging_helper.combine_loggers_helper import get_logger
+# from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 #
 #
 # def clean_silver_df(df: pd.DataFrame, debug: bool = False) -> pd.DataFrame:

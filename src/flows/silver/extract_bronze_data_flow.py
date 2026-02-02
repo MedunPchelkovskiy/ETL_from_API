@@ -8,15 +8,16 @@ from decouple import config
 # from decouple import config
 from prefect import flow
 
+from logging_config import setup_logging
 from metrics import FLOW_DURATION, PIPELINE_RUNNING
 from pushgateway_utils import push_metrics_to_gateway
 from src.clients.datalake_client import fs_client
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.silver.parsing_mapper import api_data_parsers
 from src.helpers.silver.postgres_to_records import postgres_to_records
 from src.tasks.silver.extract_from_bronze_layer_tasks import extract_bronze_data_from_postgres, \
     extract_bronze_data_from_azure_blob_task
-from src.tasks.silver.load_to_gold_tasks import load_silver_data_to_postgres_task
+from src.tasks.silver.load_to_gold_layer import load_silver_data_to_postgres
 from src.tasks.silver.transform_bronze_data_tasks import parse_api_group, clean_silver, normalize_combine_task
 
 
@@ -29,6 +30,8 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
                           hour: Optional[int] = None,
                           base_dir=config("BASE_DIR"),
                           azure_fs_client=fs_client):
+    setup_logging()
+    logger = get_logger()
     start = time.time()
     flow_name = "Transform bronze data"
     PIPELINE_RUNNING.labels(flow_name).set(1)
@@ -36,9 +39,8 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
     try:
         # your current ETL logic
         ...
-        logger = get_logger()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now()
 
         date = now.strftime("%Y-%m-%d")  # canonical
         hour_str = now.strftime("%H")  # Azure
@@ -101,7 +103,7 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
         # valid = validate_silver_data(silver_df)
         #     # Step 6: load
 
-        load_silver_data_to_postgres_task(silver_df)
+        load_silver_data_to_postgres(silver_df)
 
         status = "success"
     except Exception:

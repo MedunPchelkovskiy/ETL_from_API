@@ -1,6 +1,6 @@
 from requests import RequestException
 
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
 def call_api_with_logging(api_func, *args, name=None, **kwargs):

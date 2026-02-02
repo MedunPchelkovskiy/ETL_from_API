@@ -3,7 +3,7 @@ from prefect import task
 
 from src.workers.bronze.load_raw_data_from_weather_APIs_to_Azure_workers import upload_json
 from src.workers.bronze.load_raw_data_from_weather_APIs_to_local_postgres_workers import load_raw_api_data_to_postgres
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
 @task

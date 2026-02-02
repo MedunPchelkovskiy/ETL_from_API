@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 
 from metrics import TASK_DURATION, ROWS_PROCESSED
 from pushgateway_utils import push_task_metrics
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.silver.extract_bronze_data_for_transformation import extract_bronze_data_from_postgres_worker, \
     download_json_from_adls_worker
 

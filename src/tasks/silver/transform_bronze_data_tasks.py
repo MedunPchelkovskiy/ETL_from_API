@@ -1,7 +1,7 @@
 import pandas as pd
 from prefect import task
 
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.silver.transform_bronze_data import clean_silver_df, normalize_and_combine
 
 

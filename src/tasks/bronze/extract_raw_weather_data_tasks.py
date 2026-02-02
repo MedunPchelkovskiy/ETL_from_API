@@ -9,7 +9,7 @@ from src.helpers.bronze.get_accuweather_location_id import get_accuweather_locat
 from src.helpers.bronze.get_foreca_location_id import get_foreca_location_id_from_place_name
 from src.helpers.bronze.task_exception_logger import call_api_with_logging
 
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
 @task(retries=3, retry_delay_seconds=20, )           #add caching to prevent expensive API calls: cache_key_fn=task_input_hash, cache_expiration=timedelta(hours=1),

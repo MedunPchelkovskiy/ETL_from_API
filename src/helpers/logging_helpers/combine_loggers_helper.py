@@ -9,4 +9,4 @@ def get_logger():
         # Outside Prefect, fallback to normal Python logger
         logger = logging.getLogger(__name__)
         logger.propagate = True
-        return logger
+    return logger

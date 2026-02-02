@@ -3,11 +3,7 @@ import json
 
 from azure.core.exceptions import ResourceExistsError
 
-from logging_config import setup_logging
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
-
-setup_logging()
-logger = get_logger()
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
 
@@ -18,6 +14,7 @@ def upload_json(fs_client, base_dir, folder_name, file_name, data):
     Skips upload if the file already exists.
     Returns a dict indicating upload result for downstream tasks.
     """
+    logger = get_logger()
     directory_path = f"{base_dir}/{folder_name}"
     directory_client = fs_client.get_directory_client(directory_path)
 

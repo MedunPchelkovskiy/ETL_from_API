@@ -1,7 +1,9 @@
 from prefect import flow, runtime
 from prefect.deployments import run_deployment
 
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
+from logging_config import setup_logging
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+
 
 
 @flow(name="OrchestratorFlow")
@@ -12,6 +14,7 @@ def orchestrator_flow():
     """
 
     # Get logger and run context
+    setup_logging()
     logger = get_logger()
 
     # --- Run first deployment ---

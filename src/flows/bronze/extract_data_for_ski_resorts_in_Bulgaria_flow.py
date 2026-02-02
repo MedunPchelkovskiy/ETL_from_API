@@ -8,6 +8,7 @@ from logging_config import setup_logging
 from src.clients.datalake_client import fs_client
 from src.helpers.bronze.api_location_mapper import api_locations
 from src.helpers.bronze.extract_tasks_mapper import api_tasks
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helper.metrics_server import start_metrics_server
 from src.tasks.bronze.load_raw_weather_data_tasks import load_raw_api_data_to_azure_blob, \
     load_raw_api_data_to_postgres_local
@@ -23,6 +24,8 @@ def weather_flow_run(debug: bool = False):
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     hour_str = now.strftime("%H")
+    setup_logging()
+    logger = get_logger()
 
     for api_name, locations in api_locations.items():
         api_task = api_tasks[api_name]
@@ -53,7 +56,6 @@ def weather_flow_run(debug: bool = False):
 
 
 def main_flow():
-    setup_logging()
     start_metrics_server()
     weather_flow_run()
 

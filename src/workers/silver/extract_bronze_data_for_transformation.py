@@ -4,7 +4,7 @@ import pandas as pd
 from sqlalchemy.exc import OperationalError
 
 from src.helpers.bronze.api_location_mapper import api_locations
-from src.helpers.logging_helper.combine_loggers_helper import get_logger
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
 def download_json_from_adls_worker(azure_fs_client, base_dir, date, hour):
