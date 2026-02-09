@@ -1,13 +1,13 @@
 from azure.core.exceptions import ResourceExistsError
 
 
-def upload_bytes(fs_client, base_dir, year_folder_name, month_folder_name, day_folder_name, file_name, parquet_bytes):
+def upload_gold_bytes(fs_client, base_dir, gold_flow_name, year_folder_name, month_folder_name, day_folder_name, file_name, parquet_bytes):
     """
     Generic uploader: uploads a bytes object to Azure Data Lake.
     Handles directory creation and existence checks.
     Returns dict with upload result.
     """
-    directory_path = f"{base_dir}/{year_folder_name}/{month_folder_name}/{day_folder_name}"
+    directory_path = f"{base_dir}/{gold_flow_name}/{year_folder_name}/{month_folder_name}/{day_folder_name}"
     directory_client = fs_client.get_directory_client(directory_path)
 
     # Ensure directory exists

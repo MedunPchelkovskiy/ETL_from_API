@@ -1,3 +1,4 @@
+import json
 import time
 from datetime import datetime
 from typing import Optional
@@ -17,7 +18,7 @@ from src.helpers.silver.parsing_mapper import api_data_parsers
 from src.helpers.silver.postgres_to_records import postgres_to_records
 from src.tasks.silver.extract_from_bronze_layer_tasks import extract_bronze_data_from_postgres, \
     extract_bronze_data_from_azure_blob_task
-from src.tasks.silver.load_to_gold_layer import load_silver_data_to_postgres, load_silver_data_to_azure
+from src.tasks.silver.load_silver_data import load_silver_data_to_postgres, load_silver_data_to_azure
 from src.tasks.silver.transform_bronze_data_tasks import parse_api_group, clean_silver, normalize_combine_task
 
 
@@ -48,6 +49,11 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
 
         try:
             raw_azure_jsons = extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, hour_str)
+            logger.info(
+                "Records:\n%s",
+                json.dumps(raw_azure_jsons, indent=2, ensure_ascii=False)
+            )
+
             bronze_df = normalize_combine_task(raw_azure_jsons)
         except ResourceNotFoundError as e:
             logger.warning(
@@ -67,7 +73,7 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
 
             if api_name is None:
                 logger.warning(
-                    "Unknown raw API name, skipping | raw_name=%s", api_name
+                    "Unknown raw API name, skipping | api_name=%s", api_name
                 )
                 continue
 
@@ -84,6 +90,8 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
                 logger.info("Parsed rows: %s", len(parsed))
             else:
                 logger.warning("Parser returned empty for API: %s", api_name)
+        logger.info("My list: %s", silver_parts)
+
 
         # Step 3: merge all
         if not silver_parts:
@@ -91,6 +99,7 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
             silver_df = pd.DataFrame()
         else:
             silver_df = pd.concat(silver_parts, ignore_index=True)
+            logger.info("Silver_df before cleaning preview:\n%s", silver_df.head(301).to_string())
 
         # Step 4: clean
         silver_df = clean_silver(silver_df)
@@ -104,8 +113,9 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
         # valid = validate_silver_data(silver_df)
         #     # Step 6: load
 
-        load_silver_data_to_postgres(silver_df)
         load_silver_data_to_azure(silver_df)
+        load_silver_data_to_postgres(silver_df)
+
 
         status = "success"
     except Exception:

@@ -14,7 +14,7 @@ def normalize_combine_task(download_results):
 
 
 @task
-def parse_api_group(api_name: str, api_df: pd.DataFrame, api_parsing: dict):
+def parse_api_group(api_name: str, api_df: pd.DataFrame, api_parsers: dict):
     """
     Prefect task that parses one API's group of bronze rows.
     Uses the professional API-specific parser from `api_parsing`.
@@ -26,7 +26,7 @@ def parse_api_group(api_name: str, api_df: pd.DataFrame, api_parsing: dict):
         logger.warning("Empty dataframe for API: %s", api_name)
         return None
 
-    parser = api_parsing.get(api_name)
+    parser = api_parsers.get(api_name)
     if not parser:
         logger.warning("No parser found for API: %s", api_name)
         return None

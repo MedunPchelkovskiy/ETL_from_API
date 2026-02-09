@@ -26,7 +26,8 @@ def orchestrator_flow():
             "deployment": "weather-flow-run/local-dev"
         }
     )
-    first_result = run_deployment("weather-flow-run/Bronze")
+    first_result = run_deployment("weather-flow-run/bronze-flow")
+
     logger.info(
         "Completed First Flow Deployment",
         extra={
@@ -56,6 +57,8 @@ def orchestrator_flow():
             "state": second_result.state.type.value
         }
     )
+
+
 
 
 if __name__ == "__main__":

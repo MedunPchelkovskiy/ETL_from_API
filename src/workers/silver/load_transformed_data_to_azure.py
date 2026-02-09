@@ -4,7 +4,7 @@ import pandas as pd
 from decouple import config
 
 from src.clients.datalake_client import fs_client
-from src.helpers.basic_azure_uploader import upload_bytes
+from src.helpers.silver.silver_azure_uploader import upload_silver_bytes
 
 
 def load_silver_data_to_azure_worker(df):
@@ -26,5 +26,5 @@ def load_silver_data_to_azure_worker(df):
     parquet_bytes = parquet_buffer.getvalue()
 
     # Call base uploader
-    return upload_bytes(fs_client, config("BASE_DIR_SILVER"), year_folder_name, month_folder_name, day_folder_name,
-                        file_name, parquet_bytes)
+    return upload_silver_bytes(fs_client, config("BASE_DIR_SILVER"), year_folder_name, month_folder_name, day_folder_name,
+                               file_name, parquet_bytes)

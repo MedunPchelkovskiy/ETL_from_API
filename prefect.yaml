@@ -5,11 +5,11 @@ deployments:
   - name: Orchestrator-Deployment
     entrypoint: src/flows/master/orchestrator_flow.py:orchestrator_flow
     schedule: # optional, can remove if you want manual runs
-      type: Cron
       cron: "11 * * * *"
       timezone: Europe/Sofia
     work_pool:
       name: local-dev-process
+
 
   - name: bronze
     description: Local Prefect deployment
@@ -24,6 +24,7 @@ deployments:
     work_pool:
       name: local-dev-process
 
+
   - name: silver-flow
     description: Local Prefect deployment for second flow
     entrypoint: src/flows/silver/extract_bronze_data_flow.py:transform_bronze_data
@@ -33,3 +34,15 @@ deployments:
     concurrency_limit: 1
     work_pool:
       name: local-dev-process
+
+
+  - name: gold-flow
+    description: Local Prefect deployment for gold forecast flow
+    entrypoint: src/flows/gold/daily_dataset_forecast.py:daily_forecast
+    tags: [ local, portfolio ]
+    parameters:
+      debug: true
+    concurrency_limit: 1
+    work_pool:
+      name: local-dev-process
+
