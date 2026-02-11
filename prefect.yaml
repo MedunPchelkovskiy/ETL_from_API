@@ -4,7 +4,7 @@ name: etl_from_api
 deployments:
   - name: Orchestrator-Deployment
     entrypoint: src/flows/master/orchestrator_flow.py:orchestrator_flow
-    schedule: # optional, can remove if you want manual runs
+    schedules: # optional, can remove if you want manual runs
       cron: "11 * * * *"
       timezone: Europe/Sofia
     work_pool:
@@ -17,7 +17,7 @@ deployments:
     tags: [local, portfolio]
     parameters:
       debug: true
-    schedule:
+    schedules:
       cron: "13 * * * *"
       timezone: Europe/Sofia
     concurrency_limit: 1

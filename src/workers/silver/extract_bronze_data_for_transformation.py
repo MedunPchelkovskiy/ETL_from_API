@@ -1,6 +1,6 @@
 import json
 
-import pandas as pd
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 from src.helpers.bronze.api_location_mapper import api_locations
@@ -39,19 +39,25 @@ def extract_bronze_data_from_postgres_worker(engine, date, hour):
     DB table can be make dynamic, if needed!!
     """
     logger = get_logger()
-    # Parameterized query to prevent SQL injection
-    query = """
-        SELECT *
-        FROM raw_json_weather_api_data
-        WHERE ingest_date = %s
-          AND ingest_hour >= %s
-        ORDER BY ingest_date DESC, ingest_hour DESC;
-    """
 
     try:
-        raw_df = pd.read_sql(query, engine, params=(date, hour))
-        logger.info("Fetched raw JSON data successfully")
-        return raw_df
+        query = text("""
+               SELECT
+                   source,
+                   place_name,
+                   ingest_date,
+                   ingest_hour,
+                   payload
+               FROM raw_json_weather_api_data
+               WHERE ingest_date = :date
+                 AND ingest_hour = :hour
+           """)
+
+        with engine.connect() as conn:
+            result = conn.execute(query, {"date": date, "hour": hour})
+            records = [dict(row) for row in result.mappings()]
+
+        return records
 
     except OperationalError as e:
         logger.error("Database query failed: %s", e)

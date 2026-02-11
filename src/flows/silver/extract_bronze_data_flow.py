@@ -15,11 +15,10 @@ from pushgateway_utils import push_metrics_to_gateway
 from src.clients.datalake_client import fs_client
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.silver.parsing_mapper import api_data_parsers
-from src.helpers.silver.postgres_to_records import postgres_to_records
 from src.tasks.silver.extract_from_bronze_layer_tasks import extract_bronze_data_from_postgres, \
     extract_bronze_data_from_azure_blob_task
 from src.tasks.silver.load_silver_data import load_silver_data_to_postgres, load_silver_data_to_azure
-from src.tasks.silver.transform_bronze_data_tasks import parse_api_group, clean_silver, normalize_combine_task
+from src.tasks.silver.transform_bronze_data_tasks import clean_silver
 
 
 @flow(
@@ -38,9 +37,6 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
     PIPELINE_RUNNING.labels(flow_name).set(1)
 
     try:
-        # your current ETL logic
-        ...
-
         now = datetime.now()
 
         date = now.strftime("%Y-%m-%d")  # canonical
@@ -48,59 +44,33 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
         hour_int = int(hour_str)  # Postgres
 
         try:
-            raw_azure_jsons = extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, hour_str)
+            bronze_records = extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, hour_str)
             logger.info(
                 "Records:\n%s",
-                json.dumps(raw_azure_jsons, indent=2, ensure_ascii=False)
+                json.dumps(bronze_records, indent=2, ensure_ascii=False)
             )
 
-            bronze_df = normalize_combine_task(raw_azure_jsons)
         except ResourceNotFoundError as e:
             logger.warning(
                 "Azure file not found, falling back to Postgres | error=%s", e
             )
-            raw_postgres_records = extract_bronze_data_from_postgres(date, hour_int)
-            records_to_list = postgres_to_records(raw_postgres_records)
-            bronze_df = normalize_combine_task(records_to_list)
+            bronze_records = extract_bronze_data_from_postgres(date, hour_int)
 
         silver_parts = []
 
-        # Step 2: group in-memory
-        for api_name, api_df in bronze_df.groupby("source"):
-            logger.info("Parsing asd asd API %s | Rows asd asd: %s", api_name, len(api_df))
+        for record in bronze_records:
+            source = str(record.get("source", "")).strip()  # ensure string
+            parser = api_parsers.get(source)
 
-            # api_name = canonical_api_map.get(raw_api_name)
-
-            if api_name is None:
-                logger.warning(
-                    "Unknown raw API name, skipping | api_name=%s", api_name
-                )
-                continue
-
-            if api_name not in api_parsers:
-                logger.warning(
-                    "No parser registered for API: %s | skipping", api_name
-                )
-                continue
-
-            parsed = parse_api_group(api_name, api_df, api_parsers)
-
-            if parsed is not None and not parsed.empty:
-                silver_parts.append(parsed)
-                logger.info("Parsed rows: %s", len(parsed))
+            if parser:
+                # Wrap single dict in DataFrame for parser
+                df_parsed = parser(record)
+                if df_parsed is not None and not df_parsed.empty:
+                    silver_parts.append(df_parsed)
             else:
-                logger.warning("Parser returned empty for API: %s", api_name)
-        logger.info("My list: %s", silver_parts)
+                logger.warning("No parser found for source: %r", source)
 
-
-        # Step 3: merge all
-        if not silver_parts:
-            logger.warning("No silver data produced from any API")
-            silver_df = pd.DataFrame()
-        else:
-            silver_df = pd.concat(silver_parts, ignore_index=True)
-            logger.info("Silver_df before cleaning preview:\n%s", silver_df.head(301).to_string())
-
+        silver_df = pd.concat(silver_parts, ignore_index=True) if silver_parts else pd.DataFrame()
         # Step 4: clean
         silver_df = clean_silver(silver_df)
 
@@ -115,7 +85,6 @@ def transform_bronze_data(api_parsers: dict = api_data_parsers,
 
         load_silver_data_to_azure(silver_df)
         load_silver_data_to_postgres(silver_df)
-
 
         status = "success"
     except Exception:

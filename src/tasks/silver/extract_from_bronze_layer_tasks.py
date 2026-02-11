@@ -28,10 +28,10 @@ def extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, ho
     )
 
     # Extract data
-    raw_jsons = download_json_from_adls_worker(azure_fs_client, base_dir, date, hour)
+    raw_records = download_json_from_adls_worker(azure_fs_client, base_dir, date, hour)
 
     # Compute row count safely
-    rows_count = len(raw_jsons) if raw_jsons else 0
+    rows_count = len(raw_records) if raw_records else 0
 
     # Update Prometheus metric
     # bronze_rows_extracted.labels(
@@ -74,7 +74,7 @@ def extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, ho
     # TASK_DURATION.labels("Transform bronze data", "Extract raw jsons from Azure").observe(time.time() - start)
     # ROWS_PROCESSED.labels("Transform bronze data", "Extract raw jsons from Azure").inc(rows_count)
 
-    return raw_jsons
+    return raw_records
 
 
 @task(retries=3, retry_delay_seconds=7)
@@ -92,11 +92,11 @@ def extract_bronze_data_from_postgres(date, hour):
     # Create engine inside task to avoid Prefect caching issues
     engine = create_engine(config("DB_CONN"))
 
-    raw_pg_df = extract_bronze_data_from_postgres_worker(engine, date, hour)
+    raw_records = extract_bronze_data_from_postgres_worker(engine, date, hour)
 
     logger.info("Completed extract bronze data from Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,
                        "task_run_id": runtime.task_run.id,
                        }
                 )
-    return raw_pg_df
+    return raw_records
