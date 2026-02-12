@@ -1,6 +1,7 @@
 import pandas as pd
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.helpers.silver.parsing_mapper import api_data_parsers
 
 
 def normalize_and_combine(records: list[dict], keep_payload: bool = False) -> pd.DataFrame:
@@ -46,7 +47,27 @@ def normalize_and_combine(records: list[dict], keep_payload: bool = False) -> pd
 
     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
+def parse_records_from_api(bronze_records):
+    logger = get_logger()
+    silver_parts = []
 
+    for record in bronze_records:
+        api_name = str(record.get("source", "")).strip()  # ensure string
+        if not record:
+            logger.warning("Empty record for API: %s", api_name)
+            continue
+
+        parser = api_data_parsers.get(api_name)
+
+        if parser:
+            df_parsed = parser(record)
+            if df_parsed is not None and not df_parsed.empty:
+                silver_parts.append(df_parsed)
+        else:
+            logger.warning("No parser found for source: %r", api_name)
+    silver_df = pd.concat(silver_parts, ignore_index=True) if silver_parts else pd.DataFrame()
+
+    return silver_df
 
 
 def clean_silver_df(df: pd.DataFrame, debug: bool = False) -> pd.DataFrame:
@@ -112,6 +133,10 @@ def clean_silver_df(df: pd.DataFrame, debug: bool = False) -> pd.DataFrame:
                 df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
             else:
                 df[col] = pd.to_datetime(df[col], errors='coerce', utc=True)
+            logger.info(f"From cleaner worker df columns {date_columns} exists in dataframe")
+
+        else:
+            logger.info(f"From cleaner worker df columns {date_columns} not exists in dataframe")
 
     time_columns = ["sunrise", "sunset"]
     for col in time_columns:

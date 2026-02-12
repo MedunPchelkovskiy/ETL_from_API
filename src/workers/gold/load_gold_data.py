@@ -117,10 +117,10 @@ def load_gold_data_to_postgres_worker(df: pd.DataFrame, engine):
             )
 
         logger.info(
-            "Gold data loaded successfully | total_inserted=%s | total_skipped=%s | total_rows=%s",
+            "Daily data loaded successfully | total_inserted=%s | total_skipped=%s | total_rows=%s",
             total_inserted, total_skipped, len(df)
         )
 
     except SQLAlchemyError as e:
-        logger.exception("Failed to load gold data: %s", e)
+        logger.exception("Failed to load daily data: %s", e)
         raise

@@ -2,6 +2,11 @@ from typing import Optional
 import pandas as pd
 
 
+
+
+
+
+
 def parse_foreca_daily(record: dict) -> Optional[pd.DataFrame]:
     payload = record.get("payload", {})
     if not payload:

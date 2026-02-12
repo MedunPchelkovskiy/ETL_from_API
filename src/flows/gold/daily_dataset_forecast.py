@@ -40,7 +40,7 @@ def daily_forecast():
 
     df_data = get_daily_forecast_data(silver_df)
     load_gold_data_to_azure(df_data)
-    # load_gold_data_to_postgres(df_data)
+    load_gold_data_to_postgres(df_data)
 
     # sample = df_data.to_dict(orient="records")              # print in logs only during dev
     # logger.info(f"End of flow, sample data: {df_data}")        # print in logs only during dev
