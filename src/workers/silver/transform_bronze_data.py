@@ -47,6 +47,7 @@ def normalize_and_combine(records: list[dict], keep_payload: bool = False) -> pd
 
     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
+
 def parse_records_from_api(bronze_records):
     logger = get_logger()
     silver_parts = []
@@ -114,34 +115,53 @@ def clean_silver_df(df: pd.DataFrame, debug: bool = False) -> pd.DataFrame:
         "snow": (0, 1000)
     }
 
-    for col in numeric_columns:
+    for col, (min_val, max_val) in clipping_rules.items():
         if col in df.columns:
-            # Clip out-of-range values to None
-            if col in clipping_rules:
-                min_val, max_val = clipping_rules[col]
-                df[col] = df[col].where(df[col].isna() | ((df[col] >= min_val) & (df[col] <= max_val)), None)
-            # Ensure numeric type
+            # Clip извън диапазона → NaN
             df[col] = pd.to_numeric(df[col], errors='coerce')
+            df[col] = df[col].where((df[col] >= min_val) & (df[col] <= max_val), 0)
+            # Заместваме NaN с 0 за всички колони
+            df[col] = df[col].fillna(0)
 
-    # -------------------------
+            # -------------------------
     # Date/time fields
     # -------------------------
-    date_columns = ["forecast_date", "forecast_time"]
+
+    date_columns = ["forecast_date_utc", "forecast_hour_utc"]
+
     for col in date_columns:
         if col in df.columns:
-            if col == "forecast_date":
-                df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
-            else:
-                df[col] = pd.to_datetime(df[col], errors='coerce', utc=True)
-            logger.info(f"From cleaner worker df columns {date_columns} exists in dataframe")
+            if col == "forecast_date_utc":
+                if pd.api.types.is_datetime64_any_dtype(df[col]):
+                    logger.info(f"Column {col} is already in 'datetime' format.")
+                else:
+                    logger.warning(f"Column {col} is not in the expected 'datetime' format. Converting...")
+                    df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
 
+            elif col == "forecast_hour_utc":
+                if pd.api.types.is_integer_dtype(df[col]):
+                    logger.info(f"Column {col} is already in 'integer' format.")
+                else:
+                    logger.warning(f"Column {col} is not in the expected 'integer' format. Converting...")
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
+                # 🔹 Заместване на NaN с фиктивна стойност в допустим диапазон (0–23)
+                df[col] = df[col].fillna(0).astype(int)
+                logger.info(f"Column {col} NaNs replaced with 0 for deduplication.")
+
+            logger.info(f"Column {col} exists in dataframe and is processed.")
         else:
-            logger.info(f"From cleaner worker df columns {date_columns} not exists in dataframe")
+            logger.info(f"Column {col} does not exist in dataframe.")
 
     time_columns = ["sunrise", "sunset"]
     for col in time_columns:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors='coerce').dt.time
+            # Преобразуваме времето в datetime и задаваме часова зона (например UTC)
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+
+            # Ако часова зона липсва, задаваме UTC
+            if df[col].dt.tz is None:
+                df[col] = df[col].dt.tz_localize('UTC')
 
     # -------------------------
     # String fields
@@ -150,6 +170,11 @@ def clean_silver_df(df: pd.DataFrame, debug: bool = False) -> pd.DataFrame:
     for col in string_columns:
         if col in df.columns:
             df[col] = df[col].astype(str).where(df[col].notna(), None)
+
+    df["forecast_hour_utc"] = (
+        pd.to_numeric(df["forecast_hour_utc"], errors="coerce")
+        .astype("Int64")
+    )
 
     # -------------------------
     # Reset index
@@ -170,27 +195,6 @@ def clean_silver_df(df: pd.DataFrame, debug: bool = False) -> pd.DataFrame:
         )
 
     return df
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # import pandas as pd
 #

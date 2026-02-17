@@ -5,7 +5,7 @@ from prefect import flow
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.tasks.gold.extract_from_silver import get_silver_parquet_azure, get_silver_data_postgres
-from src.tasks.gold.load_gold_data import load_gold_data_to_azure, load_gold_data_to_postgres
+from src.tasks.gold.load_gold_data import load_gold_data_to_azure, load_gold_daily_data_to_postgres
 from src.tasks.gold.transform_silver_data import get_daily_forecast_data
 
 
@@ -40,7 +40,7 @@ def daily_forecast():
 
     df_data = get_daily_forecast_data(silver_df)
     load_gold_data_to_azure(df_data)
-    load_gold_data_to_postgres(df_data)
+    load_gold_daily_data_to_postgres(df_data)
 
     # sample = df_data.to_dict(orient="records")              # print in logs only during dev
     # logger.info(f"End of flow, sample data: {df_data}")        # print in logs only during dev

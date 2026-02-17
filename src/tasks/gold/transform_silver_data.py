@@ -15,10 +15,10 @@ def get_daily_forecast_data(df):
 
 
 @task(name="Transform silver data")
-def get_five_day_forecast_data(df):
+def get_five_day_forecast_data(silver_df):
     logger = get_logger()
     logger.info(f"Start task five day forecast data", extra={})
-    fdf_data = get_fdf_data(df)
+    fdf_data = get_fdf_data(silver_df)
     rows = len(fdf_data)
     logger.info(f"End task five day forecast data", extra={"rows_count": rows})
     return fdf_data

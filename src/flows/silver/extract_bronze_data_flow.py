@@ -1,4 +1,4 @@
-simport time
+import time
 from datetime import datetime
 from typing import Optional
 

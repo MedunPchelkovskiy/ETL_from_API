@@ -22,12 +22,11 @@ def load_silver_data_to_postgres_worker(df: pd.DataFrame, engine):
     # Ensure required columns
     required_cols = [
         "api_name", "place_name", "ingest_date", "ingest_hour",
-        "forecast_date", "forecast_time",
+        "original_ts", "forecast_date_utc", "forecast_hour_utc",
         "temp_max", "temp_min", "temp_avg",
-        "precipitation", "rain", "snow", "pop",
-        "wind_speed", "wind_deg",
-        "clouds", "humidity",
-        "weather_code", "weather_main", "weather_description", "weather_icon",
+        "precipitation", "rain", "snow", "precip_prob",
+         "humidity", "wind_speed", "wind_deg",
+        "clouds","weather_code", "weather_description", "weather_icon",
         "sunrise", "sunset"
     ]
     for col in required_cols:
@@ -44,24 +43,22 @@ def load_silver_data_to_postgres_worker(df: pd.DataFrame, engine):
     stmt = """
     INSERT INTO silver_weather_forecast_data (
         api_name, place_name, ingest_date, ingest_hour,
-        forecast_date, forecast_time,
+        original_ts, forecast_date_utc, forecast_hour_utc, 
         temp_max, temp_min, temp_avg,
-        precipitation, rain, snow, pop,
-        wind_speed, wind_deg,
-        clouds, humidity,
-        weather_code, weather_main, weather_description, weather_icon,
+        precipitation, rain, snow, precip_prob,
+         humidity, wind_speed, wind_deg,
+        clouds, weather_code, weather_description, weather_icon,
         sunrise, sunset
     ) VALUES (
         :api_name, :place_name, :ingest_date, :ingest_hour,
-        :forecast_date, :forecast_time,
+        :original_ts, :forecast_date_utc, :forecast_hour_utc, 
         :temp_max, :temp_min, :temp_avg,
-        :precipitation, :rain, :snow, :pop,
-        :wind_speed, :wind_deg,
-        :clouds, :humidity,
-        :weather_code, :weather_main, :weather_description, :weather_icon,
+        :precipitation, :rain, :snow, :precip_prob,
+         :humidity, :wind_speed, :wind_deg,
+        :clouds, :weather_code, :weather_description, :weather_icon,
         :sunrise, :sunset
     )
-    ON CONFLICT (api_name, place_name, forecast_date, forecast_time, ingest_date, ingest_hour) DO NOTHING
+    ON CONFLICT (api_name, place_name, ingest_date, ingest_hour, forecast_date_utc, forecast_hour_utc) DO NOTHING
     """
 
     batch_size = 1000

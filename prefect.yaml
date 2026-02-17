@@ -4,7 +4,7 @@ name: etl_from_api
 deployments:
   - name: Orchestrator-Deployment
     entrypoint: src/flows/master/orchestrator_flow.py:orchestrator_flow
-    schedules: # optional, can remove if you want manual runs
+    schedule: # optional, can remove if you want manual runs
       cron: "11 * * * *"
       timezone: Europe/Sofia
     work_pool:
@@ -17,7 +17,7 @@ deployments:
     tags: [local, portfolio]
     parameters:
       debug: true
-    schedules:
+    schedule:
       cron: "13 * * * *"
       timezone: Europe/Sofia
     concurrency_limit: 1
@@ -39,6 +39,19 @@ deployments:
   - name: gold-flow
     description: Local Prefect deployment for gold forecast flow
     entrypoint: src/flows/gold/daily_dataset_forecast.py:daily_forecast
+    tags: [ local, portfolio ]
+    parameters:
+      debug: true
+    concurrency_limit: 1
+    work_pool:
+      name: local-dev-process
+
+  - name: gold-five-day-forecast
+    description: Local Prefect deployment for gold five day forecast flow
+    entrypoint: src/flows/gold/five_day_dataset_forecast.py:five_day_forecast
+    schedule:
+      cron: "20 * * * *"
+      timezone: Europe/Sofia
     tags: [ local, portfolio ]
     parameters:
       debug: true

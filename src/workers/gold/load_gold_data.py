@@ -34,7 +34,7 @@ def load_gold_data_to_azure_worker(df):
                         file_name, parquet_bytes)
 
 
-def load_gold_data_to_postgres_worker(df: pd.DataFrame, engine):
+def load_gold_daily_data_to_postgres_worker(df: pd.DataFrame, engine):
     """
     Loader for gold_daily_forecast_data using custom sanitizer.
 
@@ -74,7 +74,7 @@ def load_gold_data_to_postgres_worker(df: pd.DataFrame, engine):
     stmt = """
     INSERT INTO gold_daily_forecast_data (
         place_name, ingest_date, ingest_hour,
-        forecast_date, forecast_time,
+        forecast_date_utc, forecast_hour_utc,
         temp_max, temp_min, temp_avg,
         rain_min, rain_max, rain_avg,
         snow_min, snow_max, snow_avg,
@@ -83,7 +83,99 @@ def load_gold_data_to_postgres_worker(df: pd.DataFrame, engine):
         humidity_min, humidity_max, humidity_avg
     ) VALUES (
         :place_name, :ingest_date, :ingest_hour,
-        :forecast_date, :forecast_time,
+        :forecast_date_utc, :forecast_hour_utc,
+        :temp_max, :temp_min, :temp_avg,
+        :rain_min, :rain_max, :rain_avg,
+        :snow_min, :snow_max, :snow_avg,
+        :wind_speed_min, :wind_speed_max, :wind_speed_avg,
+        :cloud_cover_min, :cloud_cover_max, :cloud_cover_avg,
+        :humidity_min, :humidity_max, :humidity_avg
+    )   
+    ON CONFLICT (place_name, forecast_date_utc, forecast_hour_utc) DO NOTHING;
+    """
+
+    batch_size = 1000
+    total_inserted = 0
+    total_skipped = 0
+
+    try:
+        for start in range(0, len(df), batch_size):
+            batch = df.iloc[start:start + batch_size]
+            values = _sanitize(batch.to_dict(orient="records"))
+
+            with engine.begin() as connection:
+                result = connection.execute(text(stmt), values)
+                inserted = result.rowcount or 0
+                skipped = len(values) - inserted
+
+            total_inserted += inserted
+            total_skipped += skipped
+
+            logger.info(
+                "Batch %s loaded | inserted=%s | skipped=%s | total=%s",
+                start // batch_size + 1, inserted, skipped, len(values)
+            )
+
+        logger.info(
+            "Daily data loaded successfully | total_inserted=%s | total_skipped=%s | total_rows=%s",
+            total_inserted, total_skipped, len(df)
+        )
+
+    except SQLAlchemyError as e:
+        logger.exception("Failed to load daily data: %s", e)
+        raise
+
+
+def load_five_day_data_to_postgres_worker(df: pd.DataFrame, engine):
+    """
+    Loader for gold_daily_forecast_data using custom sanitizer.
+
+    Args:
+        df (pd.DataFrame): Data to insert.
+        engine: SQLAlchemy Engine connected to Postgres.
+    """
+    logger = get_logger()
+
+    if df is None or df.empty:
+        logger.warning("Gold load skipped: empty dataframe")
+        return
+
+    # Ensure required columns
+    required_cols = [
+        "place_name", "ingest_date", "ingest_hour",
+        "forecast_date_utc", "forecast_hour_utc",
+        "temp_max", "temp_min", "temp_avg",
+        "rain_min", "rain_max", "rain_avg",
+        "snow_min", "snow_max", "snow_avg",
+        "wind_speed_min", "wind_speed_max", "wind_speed_avg",
+        "cloud_cover_min", "cloud_cover_max", "cloud_cover_avg",
+        "humidity_min", "humidity_max", "humidity_avg"
+    ]
+
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = None
+
+    # Your custom sanitizer
+    def _sanitize(records):
+        return [
+            {k: (None if v is pd.NaT or v == "NaT" else v) for k, v in row.items()}
+            for row in records
+        ]
+
+    stmt = """
+    INSERT INTO gold_five_day_forecast_data (
+        place_name, ingest_date, ingest_hour,
+        forecast_date_utc, forecast_hour_utc,
+        temp_max, temp_min, temp_avg,
+        rain_min, rain_max, rain_avg,
+        snow_min, snow_max, snow_avg,
+        wind_speed_min, wind_speed_max, wind_speed_avg,
+        cloud_cover_min, cloud_cover_max, cloud_cover_avg,
+        humidity_min, humidity_max, humidity_avg
+    ) VALUES (
+        :place_name, :ingest_date, :ingest_hour,
+        :forecast_date_utc, :forecast_hour_utc,
         :temp_max, :temp_min, :temp_avg,
         :rain_min, :rain_max, :rain_avg,
         :snow_min, :snow_max, :snow_avg,

@@ -61,7 +61,7 @@ def get_silver_data_postgres():
                     "flow_run_id": prefect.runtime.flow_run.id,
                     "task_run_id": prefect.runtime.task_run.id
                 })
-    engine = create_engine(config("DB_CONN_SILVER"))
+    engine = create_engine(config("DB_CONN_RAW"))
     silver_df = None
     try:
         silver_df = fetch_silver_data_postgres(date, hour_int, engine)

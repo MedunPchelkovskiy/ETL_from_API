@@ -90,7 +90,7 @@ def extract_bronze_data_from_postgres(date, hour):
                 )
 
     # Create engine inside task to avoid Prefect caching issues
-    engine = create_engine(config("DB_CONN"))
+    engine = create_engine(config("DB_CONN_RAW"))
 
     raw_records = extract_bronze_data_from_postgres_worker(engine, date, hour)
 

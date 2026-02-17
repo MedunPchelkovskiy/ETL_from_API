@@ -67,7 +67,7 @@ def get_from_meteoblue_api(place_name, country):
 
 def extract_data_from_tomorrow_api(place_name):
     logger = get_logger()
-    url = f"https://api.tomorrow.io/v4/weather/forecast?location={place_name}&timesteps=daily:'7d'&apikey={config('TOMMOROW_API_KEY')}"
+    url = f"https://api.tomorrow.io/v4/weather/forecast?location={place_name}&timesteps=1d&units=metric&apikey={config('TOMMOROW_API_KEY')}"
 
     headers = {
         "accept": "application/json",
