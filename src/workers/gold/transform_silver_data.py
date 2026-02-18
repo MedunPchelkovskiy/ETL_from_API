@@ -5,9 +5,9 @@ import pandas as pd
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
-def get_df_data(silver_df) -> pd.DataFrame:
+def get_df_data(silver_df, generated_at) -> pd.DataFrame:
     df_data = pd.DataFrame()
-    df_data = silver_df.groupby(["place_name", "ingest_date", "ingest_hour"]).agg(
+    df_data = silver_df.groupby(["place_name", "forecast_date_utc"]).agg(
         temp_max=('temp_max', 'max'),
         temp_min=('temp_min', 'min'),
         temp_avg=('temp_avg', 'mean'),
@@ -27,6 +27,8 @@ def get_df_data(silver_df) -> pd.DataFrame:
         humidity_max=("humidity", "max"),
         humidity_avg=("humidity", "mean"),
     ).reset_index()
+
+    df_data["generated_at"] = generated_at
 
     return df_data
 

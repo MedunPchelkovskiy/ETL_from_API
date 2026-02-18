@@ -1,3 +1,5 @@
+import uuid
+
 import pandas as pd
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
@@ -175,6 +177,10 @@ def clean_silver_df(df: pd.DataFrame, debug: bool = False) -> pd.DataFrame:
         pd.to_numeric(df["forecast_hour_utc"], errors="coerce")
         .astype("Int64")
     )
+
+    batch_id = uuid.uuid4()
+    df["batch_id"] = batch_id
+    df['batch_id'] = df['batch_id'].astype(str)
 
     # -------------------------
     # Reset index

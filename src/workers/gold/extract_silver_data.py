@@ -3,32 +3,33 @@ from io import BytesIO
 import pandas as pd
 from decouple import config
 
-from src.clients.datalake_client import fs_client
-from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
-
-def fetch_silver_parquet_blob(year, month, day, hour):
+def fetch_silver_parquet_blob(year, month, day, hour, fs_client):
     dir_path = f"{config('BASE_DIR_SILVER')}/{year}/{month}/{day}"
+    file_client = fs_client.get_directory_client(dir_path).get_file_client(f"{hour}.parquet")
 
-    directory_client = fs_client.get_directory_client(dir_path)
-    file_client = directory_client.get_file_client(f"{hour}.parquet")
+    try:
+        downloaded_bytes = file_client.download_file().readall()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Parquet file not found: {year}-{month}-{day}-{hour}")
 
-    # download as bytes
-    downloaded_bytes = file_client.download_file().readall()
+    df = pd.read_parquet(BytesIO(downloaded_bytes))
 
-    # wrap in BytesIO so Pandas can read it
-    return BytesIO(downloaded_bytes)
+    # sanitize UUIDs
+    import uuid
+    for col in df.columns:
+        if df[col].dtype == object and not df[col].empty and isinstance(df[col].iloc[0], uuid.UUID):
+            df[col] = df[col].astype(str)
+
+    return df
 
 
-def fetch_silver_data_postgres(date, hour_int, engine):
+def fetch_silver_data_postgres(date, hour_int, engine, chunksize=100_000):
     """
-    Worker function to fetch silver weather data from Postgres.
+    Fetch silver data from Postgres in chunks, sanitize UUIDs.
 
-    Raises:
-        ValueError: if no data is found for the given date and hour
+    Raises ValueError if no data.
     """
-    logger = get_logger()
-
     query = """
         SELECT *
         FROM silver_weather_forecast_data
@@ -36,20 +37,15 @@ def fetch_silver_data_postgres(date, hour_int, engine):
           AND ingest_hour >= %(hour)s
         ORDER BY ingest_date DESC, ingest_hour DESC;
     """
+    chunks = []
+    for chunk in pd.read_sql(query, engine, params={"date": date, "hour": hour_int}, chunksize=chunksize):
+        # sanitize UUIDs
+        for col in chunk.columns:
+            if chunk[col].dtype == object and not chunk[col].empty and isinstance(chunk[col].iloc[0], uuid.UUID):
+                chunk[col] = chunk[col].astype(str)
+        chunks.append(chunk)
 
-    try:
-        silver_df = pd.read_sql(
-            query,
-            engine,
-            params={"date": date, "hour": hour_int}
-        )
+    if not chunks:
+        raise ValueError(f"No silver data found for {date}-{hour_int}")
 
-        # Check if DataFrame is empty → fail task in pipeline
-        if silver_df.empty:
-            raise ValueError(f"No silver data found for {date}-{hour_int}")
-
-        return silver_df
-
-    except Exception as e:
-        logger.error(f"Failed to fetch silver data: {e}")
-        raise
+    return pd.concat(chunks, ignore_index=True)
