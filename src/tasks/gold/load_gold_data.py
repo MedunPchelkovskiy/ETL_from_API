@@ -9,7 +9,7 @@ from src.workers.gold.load_gold_data import load_gold_data_to_azure_worker, load
 
 
 @task(name="Load gold data to Azure blob", retries=3, retry_delay_seconds=300)
-def load_gold_data_to_azure(df):
+def load_gold_data_to_azure(gold_result:list):
     logger = get_logger()
     logger.info("Start task loading gold data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,
@@ -17,7 +17,7 @@ def load_gold_data_to_azure(df):
                        }
                 )
 
-    load_gold_data_to_azure_worker(df)
+    load_gold_data_to_azure_worker(gold_result)
 
     logger.info("Completed task loading gold data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,

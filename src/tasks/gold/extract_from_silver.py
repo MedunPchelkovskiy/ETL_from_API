@@ -1,7 +1,4 @@
-import pandas as pd
 import pendulum
-import psycopg2
-from decouple import config
 from fabric.decorators import task
 
 from src.clients.datalake_client import fs_client
@@ -10,78 +7,73 @@ from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.gold.extract_silver_data import fetch_silver_parquet_blob
 
 
-fs_client = None  # TODO: set proper Azure client
-
 @task(name="Get silver data from Azure Parquet Incremental", retries=3, retry_delay_seconds=60)
 def get_silver_parquet_azure(forecast_day, max_hour):
     logger = get_logger()
-    start = pendulum.now("UTC")
+    start_time = pendulum.now("UTC")
 
-    year = forecast_day.format("YYYY")
-    month = forecast_day.format("MM")
-    day = forecast_day.format("DD")
-
-    # Пътят към Gold layer за проверка на last processed
-    dir_path = f"{config('BASE_DIR_GOLD')}/{year}/{month}/{day}"
-
-    conn = psycopg2.connect(config("DB_CONN_RAW"))
     pipeline_name = "daily_dataset_forecast"
 
-    # 1️ Проверяваме до кой час вече имаме Gold
-    last_processed_hour = get_last_processed_timestamp(
-        conn, pipeline_name
+    last_processed_ts = get_last_processed_timestamp(pipeline_name)
+    logger.info("Last processed TS: {}".format(last_processed_ts))
+
+    if last_processed_ts is None:
+        last_processed_ts = (pendulum.now("UTC").start_of("hour").subtract(days=1))
+        logger.info(f"If last processed is None.")
+
+    target_ts = forecast_day.replace(
+        hour=int(max_hour.format("HH")),
+        minute=0,
+        second=0,
+        microsecond=0
     )
-    logger.info(f"Last processed Gold hour: {last_processed_hour}")
 
-    # 2️ Определяме до кой час трябва да обработим (например текущия max_hour)
-    target_hour = int(max_hour.format("HH"))
-
-    if last_processed_hour >= target_hour:
+    if last_processed_ts >= target_ts:
         logger.info("No new Silver files to process.")
         return []
 
     result = []
+    current_ts = last_processed_ts.start_of("hour").add(hours=1)
 
-    # ✅ Backlog loop - върви само по пропуснатите часове
-    for hour in range(last_processed_hour + 1, target_hour + 1):
-        logger.info(f"Processing Silver hour {hour:02d}")
+    while current_ts <= target_ts:
 
-        df = fetch_silver_parquet_blob(
-            year,
-            month,
-            day,
-            f"{hour:02d}",
-            fs_client
-        )
+        year = current_ts.format("YYYY")
+        month = current_ts.format("MM")
+        day = current_ts.format("DD")
+        hour = current_ts.format("HH")
 
-        if df.empty:
-            logger.warning(f"Silver file missing or empty for {hour:02d}")
-            continue
+        logger.info(f"Processing Silver {year}-{month}-{day} {hour}:00")
 
-        # добавяме tuple (hour, df) за всеки processed файл
-        result.append((hour, df))
+        try:
+            df = fetch_silver_parquet_blob(
+                year=year,
+                month=month,
+                day=day,
+                hour=hour,
+                fs_client=fs_client
+            )
 
-    duration = (pendulum.now("UTC") - start).total_seconds()
+            if not df.empty:
+                result.append((current_ts, df))
+            else:
+                logger.warning(f"Empty Silver file for {year}-{month}-{day} {hour}")
+
+        except Exception as e:
+            logger.warning(
+                f"Missing Silver file for {year}-{month}-{day} {hour} | error={e}"
+            )
+
+        current_ts = current_ts.add(hours=1)
+
+    duration = (pendulum.now("UTC") - start_time).total_seconds()
 
     logger.info(
         f"Finished incremental Silver download. "
-        f"Hours processed: {len(result)}. "
+        f"Windows processed: {len(result)}. "
         f"Duration: {duration:.2f}s"
     )
 
     return result
-
-
-
-
-
-
-
-
-
-
-
-
 
 # @task(name="Get silver data from Azure Parquet Incremental", retries=3, retry_delay_seconds=60)
 # def get_silver_parquet_azure(forecast_day, max_hour):

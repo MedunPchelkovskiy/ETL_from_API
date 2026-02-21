@@ -1,3 +1,6 @@
+import pandas as pd
+
+
 def flatten_incremental_silver(result_list):
     """
     result_list: list of tuples (hour, df)

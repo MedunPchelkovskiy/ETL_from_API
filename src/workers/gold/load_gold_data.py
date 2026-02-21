@@ -10,28 +10,30 @@ from src.helpers.gold.load import upload_gold_bytes
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
-def load_gold_data_to_azure_worker(df):
+def load_gold_data_to_azure_worker(gold_result:list):
     """
     Converts a Pandas DataFrame to Parquet bytes and uploads to Azure using the base uploader.
     """
-    year_str = pd.to_datetime(df["forecast_date_utc"]).dt.strftime("%Y").iloc[0]
-    month_str = pd.to_datetime(df["forecast_date_utc"]).dt.strftime("%m").iloc[0]
-    day_str = pd.to_datetime(df["forecast_date_utc"]).dt.strftime("%d").iloc[0]
-    hour_str = df["generated_at"].astype(str).str.zfill(2).iloc[0]
+    for ts, df in gold_result:
+        year_str = ts.year
+        month_str = ts.month
+        day_str = ts.day
+        hour_str = ts.hour
 
-    gold_flow_name = "daily-forecast"
-    year_folder_name = f"{year_str}"
-    month_folder_name = f"{month_str}"
-    day_folder_name = f"{day_str}"
-    file_name = f"{hour_str}.parquet"
-    # Convert to Parquet bytes
-    parquet_buffer = io.BytesIO()
-    df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
-    parquet_bytes = parquet_buffer.getvalue()
 
-    # Call base uploader
-    return upload_gold_bytes(fs_client, config("BASE_DIR_GOLD"), gold_flow_name, year_folder_name, month_folder_name, day_folder_name,
-                        file_name, parquet_bytes)
+        year_folder_name = f"{year_str}"
+        month_folder_name = f"{month_str}"
+        day_folder_name = f"{day_str}"
+        file_name = f"{hour_str}.parquet"
+        # Convert to Parquet bytes
+        parquet_buffer = io.BytesIO()
+        df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
+        parquet_bytes = parquet_buffer.getvalue()
+        upload_gold_bytes(fs_client, config("BASE_DIR_GOLD"), year_folder_name, month_folder_name,
+                          day_folder_name,
+                          file_name, parquet_bytes)
+
+
 
 
 def load_gold_daily_data_to_postgres_worker(df: pd.DataFrame, engine):

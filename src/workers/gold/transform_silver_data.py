@@ -1,36 +1,40 @@
-from datetime import date, datetime
+from datetime import datetime
 
 import pandas as pd
+import pendulum
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
-def get_df_data(silver_df, generated_at) -> pd.DataFrame:
+def get_df_data(silver_results: list, generated_at: pendulum.DateTime) -> list[tuple]:
     df_data = pd.DataFrame()
-    df_data = silver_df.groupby(["place_name", "forecast_date_utc"]).agg(
-        temp_max=('temp_max', 'max'),
-        temp_min=('temp_min', 'min'),
-        temp_avg=('temp_avg', 'mean'),
-        wind_speed_avg=('wind_speed', 'mean'),
-        wind_speed_max=('wind_speed', 'max'),
-        wind_speed_min=('wind_speed', 'min'),
-        rain_min=("rain", "min"),
-        rain_max=("rain", "max"),
-        rain_avg=("rain", "mean"),
-        snow_min=("snow", "min"),
-        snow_max=("snow", "max"),
-        snow_avg=("snow", "mean"),
-        cloud_cover_min=("clouds", "min"),
-        cloud_cover_max=("clouds", "max"),
-        cloud_cover_avg=("clouds", "mean"),
-        humidity_min=("humidity", "min"),
-        humidity_max=("humidity", "max"),
-        humidity_avg=("humidity", "mean"),
-    ).reset_index()
+    gold_results = []
+    for ts, df in silver_results:
+        df_data = df.groupby(["place_name", "forecast_date_utc"]).agg(
+            temp_max=('temp_max', 'max'),
+            temp_min=('temp_min', 'min'),
+            temp_avg=('temp_avg', 'mean'),
+            wind_speed_avg=('wind_speed', 'mean'),
+            wind_speed_max=('wind_speed', 'max'),
+            wind_speed_min=('wind_speed', 'min'),
+            rain_min=("rain", "min"),
+            rain_max=("rain", "max"),
+            rain_avg=("rain", "mean"),
+            snow_min=("snow", "min"),
+            snow_max=("snow", "max"),
+            snow_avg=("snow", "mean"),
+            cloud_cover_min=("clouds", "min"),
+            cloud_cover_max=("clouds", "max"),
+            cloud_cover_avg=("clouds", "mean"),
+            humidity_min=("humidity", "min"),
+            humidity_max=("humidity", "max"),
+            humidity_avg=("humidity", "mean"),
+        ).reset_index().round(2)
 
-    df_data["generated_at"] = generated_at
+        df_data["generated_at"] = generated_at
+        gold_results.append((ts, df_data))
 
-    return df_data
+    return gold_results
 
 
 def get_fdf_data(df) -> pd.DataFrame:

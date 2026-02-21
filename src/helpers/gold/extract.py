@@ -1,5 +1,10 @@
+from typing import Optional
+
 import pandas as pd
 import pendulum
+import psycopg2
+from decouple import config
+
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
@@ -16,22 +21,39 @@ def get_last_gold_timestamp_postgres(engine, table_name):
 
 
 
-def get_last_processed_timestamp(conn, pipeline_name: str):
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT last_processed_timestamp
-            FROM pipeline_metadata
-            WHERE pipeline_name = %s
-            """,
-            (pipeline_name,)
-        )
-        row = cur.fetchone()
+def get_last_processed_timestamp(pipeline_name: str) -> Optional[pendulum.DateTime]:
+    """
+    Връща последния успешно обработен timestamp за даден pipeline.
+    Ако няма запис, връща None.
+    """
 
-    return row[0] if row else None
+    conn = psycopg2.connect(config("DB_CONN_RAW"))
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT last_processed_timestamp
+                FROM pipeline_metadata
+                WHERE pipeline_name = %s
+                ORDER BY last_processed_timestamp DESC
+                LIMIT 1
+                """,
+                (pipeline_name,)
+            )
+            row = cur.fetchone()
+
+        if not row:
+            return None
+
+        # Конвертираме в pendulum UTC (production-safe сравнения)
+        return pendulum.instance(row[0]).in_timezone("UTC")
+
+    finally:
+        conn.close()
 
 
-def update_last_processed_timestamp(conn, pipeline_name: str, new_ts):
+def update_last_processed_timestamp(conn, pipeline_name: str, new_timestamp):
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -42,6 +64,6 @@ def update_last_processed_timestamp(conn, pipeline_name: str, new_ts):
                 last_processed_timestamp = EXCLUDED.last_processed_timestamp,
                 updated_at = NOW()
             """,
-            (pipeline_name, new_ts)
+            (pipeline_name, new_timestamp)
         )
     conn.commit()
