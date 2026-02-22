@@ -3,13 +3,11 @@ import prefect
 from azure.core.exceptions import ResourceNotFoundError
 from prefect import flow
 
-from src.helpers.gold.transform import flatten_incremental_silver
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.tasks.gold.extract_from_silver import get_silver_parquet_azure
-from src.tasks.gold.load_gold_data import load_gold_data_to_azure#, load_gold_daily_data_to_postgres
+from src.tasks.gold.load_gold_data import load_gold_data_to_azure, \
+    load_gold_daily_data_to_postgres
 from src.tasks.gold.transform_silver_data import get_daily_forecast_data
-
-
 
 
 @flow(
@@ -18,6 +16,7 @@ def daily_forecast(forecast_day=None, max_hour=None):  # possibly can pass old d
     logger = get_logger()
     now = pendulum.now("UTC")
     generated_at = now
+    pipeline_name = "daily_dataset_forecast"
 
     if forecast_day is None:
         forecast_day = now
@@ -35,7 +34,7 @@ def daily_forecast(forecast_day=None, max_hour=None):  # possibly can pass old d
     silver_result = []
     try:
         # task вече връща list of tuples (hour, df) за пропуснатите часове
-        silver_result = get_silver_parquet_azure(forecast_day, max_hour)
+        silver_result = get_silver_parquet_azure(pipeline_name, forecast_day, max_hour)
     except ResourceNotFoundError as e:
         logger.info(
             f"No parquet file found for day  {forecast_day.format('DD')}/{max_hour.hour}.parquet, fall back to postgres | error={e}",
@@ -52,8 +51,8 @@ def daily_forecast(forecast_day=None, max_hour=None):  # possibly can pass old d
         logger.info("No new Silver data to process after flattening.")
 
     gold_result = get_daily_forecast_data(silver_result, generated_at)
-    load_gold_data_to_azure(gold_result)
-    # load_gold_daily_data_to_postgres(df_data)
+    load_gold_data_to_azure(pipeline_name, gold_result)
+    load_gold_daily_data_to_postgres(gold_result)
 
     # print first 5 rows vertically for dev logs
     for i, (ts, df) in enumerate(gold_result[:5]):
@@ -77,18 +76,6 @@ def daily_forecast(forecast_day=None, max_hour=None):  # possibly can pass old d
 
 if __name__ == "__main__":
     daily_forecast()
-
-
-
-
-
-
-
-
-
-
-
-
 
 # @flow(
 #     name="daily_dataset_forecast", )

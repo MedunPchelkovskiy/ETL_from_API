@@ -9,7 +9,7 @@ from src.workers.gold.load_gold_data import load_gold_data_to_azure_worker, load
 
 
 @task(name="Load gold data to Azure blob", retries=3, retry_delay_seconds=300)
-def load_gold_data_to_azure(gold_result:list):
+def load_gold_data_to_azure(pipeline_name, gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,
@@ -17,7 +17,7 @@ def load_gold_data_to_azure(gold_result:list):
                        }
                 )
 
-    load_gold_data_to_azure_worker(gold_result)
+    load_gold_data_to_azure_worker(pipeline_name, gold_result)
 
     logger.info("Completed task loading gold data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,
@@ -27,7 +27,7 @@ def load_gold_data_to_azure(gold_result:list):
 
 
 @task(retries=3, retry_delay_seconds=300)
-def load_gold_daily_data_to_postgres(data):
+def load_gold_daily_data_to_postgres(gold_result:list):
     logger = get_logger()
     logger.info("Start task loading gold data to Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,
@@ -35,7 +35,7 @@ def load_gold_daily_data_to_postgres(data):
                        }
                 )
     engine = create_engine(config("DB_CONN_RAW"))
-    load_gold_daily_data_to_postgres_worker(data, engine)
+    load_gold_daily_data_to_postgres_worker(gold_result, engine)
     logger.info("Completed task loading gold data to Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,
                        "task_run_id": runtime.task_run.id,

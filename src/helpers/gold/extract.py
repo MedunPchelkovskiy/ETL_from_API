@@ -5,8 +5,6 @@ import pendulum
 import psycopg2
 from decouple import config
 
-from src.helpers.logging_helpers.combine_loggers_helper import get_logger
-
 
 def get_last_gold_timestamp_postgres(engine, table_name):
     """
@@ -20,15 +18,12 @@ def get_last_gold_timestamp_postgres(engine, table_name):
     return pendulum.parse(str(last_ts))
 
 
-
 def get_last_processed_timestamp(pipeline_name: str) -> Optional[pendulum.DateTime]:
     """
     Връща последния успешно обработен timestamp за даден pipeline.
     Ако няма запис, връща None.
     """
-
     conn = psycopg2.connect(config("DB_CONN_RAW"))
-
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -51,19 +46,3 @@ def get_last_processed_timestamp(pipeline_name: str) -> Optional[pendulum.DateTi
 
     finally:
         conn.close()
-
-
-def update_last_processed_timestamp(conn, pipeline_name: str, new_timestamp):
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO pipeline_metadata (pipeline_name, last_processed_timestamp)
-            VALUES (%s, %s)
-            ON CONFLICT (pipeline_name)
-            DO UPDATE SET
-                last_processed_timestamp = EXCLUDED.last_processed_timestamp,
-                updated_at = NOW()
-            """,
-            (pipeline_name, new_timestamp)
-        )
-    conn.commit()

@@ -2,14 +2,18 @@ from datetime import datetime
 
 import pandas as pd
 import pendulum
+from pytz import UTC
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
 def get_df_data(silver_results: list, generated_at: pendulum.DateTime) -> list[tuple]:
-    df_data = pd.DataFrame()
     gold_results = []
+    today = pendulum.today("UTC").date()
     for ts, df in silver_results:
+        df = df[df["forecast_date"] == today]
+        if df.empty:
+            continue
         df_data = df.groupby(["place_name", "forecast_date_utc"]).agg(
             temp_max=('temp_max', 'max'),
             temp_min=('temp_min', 'min'),
@@ -31,6 +35,8 @@ def get_df_data(silver_results: list, generated_at: pendulum.DateTime) -> list[t
             humidity_avg=("humidity", "mean"),
         ).reset_index().round(2)
 
+        df_data["ingest_date"] = pd.to_datetime(df["ingest_date"]).dt.date
+        df_data["ingest_hour"] = pd.to_datetime(df["ingest_hour"]).dt.hour
         df_data["generated_at"] = generated_at
         gold_results.append((ts, df_data))
 

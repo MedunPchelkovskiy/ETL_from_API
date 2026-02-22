@@ -8,11 +8,9 @@ from src.workers.gold.extract_silver_data import fetch_silver_parquet_blob
 
 
 @task(name="Get silver data from Azure Parquet Incremental", retries=3, retry_delay_seconds=60)
-def get_silver_parquet_azure(forecast_day, max_hour):
+def get_silver_parquet_azure(pipeline_name, forecast_day, max_hour):
     logger = get_logger()
     start_time = pendulum.now("UTC")
-
-    pipeline_name = "daily_dataset_forecast"
 
     last_processed_ts = get_last_processed_timestamp(pipeline_name)
     logger.info("Last processed TS: {}".format(last_processed_ts))
