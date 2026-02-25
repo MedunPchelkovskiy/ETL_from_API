@@ -3,6 +3,7 @@ name: etl_from_api
 
 deployments:
   - name: Orchestrator-Deployment
+    description: Local Prefect deployment for orchestrator flow
     entrypoint: src/flows/master/orchestrator_flow.py:orchestrator_flow
     schedule: # optional, can remove if you want manual runs
       cron: "11 * * * *"
@@ -11,22 +12,19 @@ deployments:
       name: local-dev-process
 
 
-  - name: bronze
-    description: Local Prefect deployment
+  - name: bronze-flow
+    description: Local Prefect deployment for bronze layer
     entrypoint: src/flows/bronze/extract_data_for_ski_resorts_in_Bulgaria_flow.py:weather_flow_run
     tags: [local, portfolio]
     parameters:
       debug: true
-    schedule:
-      cron: "13 * * * *"
-      timezone: Europe/Sofia
     concurrency_limit: 1
     work_pool:
       name: local-dev-process
 
 
   - name: silver-flow
-    description: Local Prefect deployment for second flow
+    description: Local Prefect deployment for silver layer
     entrypoint: src/flows/silver/extract_bronze_data_flow.py:transform_bronze_data
     tags: [ local, portfolio ]
     parameters:
@@ -37,7 +35,7 @@ deployments:
 
 
   - name: gold-flow
-    description: Local Prefect deployment for gold forecast flow
+    description: Local Prefect deployment for gold forecast layer
     entrypoint: src/flows/gold/daily_dataset_forecast.py:daily_forecast
     tags: [ local, portfolio ]
     parameters:
@@ -49,9 +47,6 @@ deployments:
   - name: gold-five-day-forecast
     description: Local Prefect deployment for gold five day forecast flow
     entrypoint: src/flows/gold/five_day_dataset_forecast.py:five_day_forecast
-    schedule:
-      cron: "20 * * * *"
-      timezone: Europe/Sofia
     tags: [ local, portfolio ]
     parameters:
       debug: true

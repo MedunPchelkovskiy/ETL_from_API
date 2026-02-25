@@ -43,8 +43,15 @@ def load_gold_daily_data_to_postgres(gold_result:list):
                 )
 
 
+
+
+
+
+
+
+
 @task(retries=3, retry_delay_seconds=300)
-def load_gold_five_day_data_to_postgres(data):
+def load_gold_five_day_data_to_postgres(fd_gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold data to Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,
@@ -52,7 +59,7 @@ def load_gold_five_day_data_to_postgres(data):
                        }
                 )
     engine = create_engine(config("DB_CONN_RAW"))
-    load_five_day_data_to_postgres_worker(data, engine)
+    load_five_day_data_to_postgres_worker(fd_gold_result, engine)
     logger.info("Completed task loading gold data to Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,
                        "task_run_id": runtime.task_run.id,

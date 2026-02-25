@@ -5,7 +5,6 @@ from logging_config import setup_logging
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
-
 @flow(name="OrchestratorFlow")
 def orchestrator_flow():
     """
@@ -17,7 +16,7 @@ def orchestrator_flow():
     setup_logging()
     logger = get_logger()
 
-    # --- Run first deployment ---
+    # --- Run bronze deployment ---
     logger.info(
         "Starting First Flow Deployment...",
         extra={
@@ -38,7 +37,7 @@ def orchestrator_flow():
         }
     )
 
-    # --- Run second deployment ---
+    # --- Run silver deployment ---
     logger.info(
         "Starting Silver Flow Deployment...",
         extra={
@@ -58,7 +57,25 @@ def orchestrator_flow():
         }
     )
 
-
+    # --- Run gold forecast deployment ---
+    logger.info(
+        "Starting Gold Flow Deployment...",
+        extra={
+            "flow_run_id": runtime.flow_run.id,
+            "task_run_id": runtime.task_run.id if runtime.task_run else None,
+            "deployment": "daily_dataset_forecast/gold-flow"
+        }
+    )
+    gold_result = run_deployment("daily_dataset_forecast/gold-flow")
+    logger.info(
+        "Completed Gold Flow Deployment",
+        extra={
+            "flow_run_id": runtime.flow_run.id,
+            "task_run_id": runtime.task_run.id if runtime.task_run else None,
+            "deployment": "daily_dataset_forecast/gold-flow",
+            "state": gold_result.state.type.value
+        }
+    )
 
 
 if __name__ == "__main__":
