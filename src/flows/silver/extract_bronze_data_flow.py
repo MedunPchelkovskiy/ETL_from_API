@@ -2,6 +2,7 @@ import time
 from datetime import datetime
 from typing import Optional
 
+import pendulum
 from azure.core.exceptions import ResourceNotFoundError
 from decouple import config
 from prefect import flow
@@ -18,7 +19,7 @@ from src.tasks.silver.transform_bronze_data_tasks import clean_silver, parse_api
 
 
 @flow(
-    flow_run_name=lambda: f"Extract bronze data for transformation flow - {datetime.now().strftime('%d%m%Y-%H%M%S')}"
+    flow_run_name=lambda: f"Extract bronze data for transformation flow - {pendulum.now("UTC").strftime('DD-MM-YYYY-HH:MM:SS')}"
     # Lambda give dynamically timestamp on every flow execution
 )
 def transform_bronze_data(date: Optional[str] = None,
@@ -27,15 +28,15 @@ def transform_bronze_data(date: Optional[str] = None,
                           azure_fs_client=fs_client):
     setup_logging()
     logger = get_logger()
-    start = time.time()
+    start = pendulum.now("UTC")
     flow_name = "Transform bronze data"
     PIPELINE_RUNNING.labels(flow_name).set(1)
 
     try:
-        now = datetime.now()
+        now = pendulum.now("UTC")
 
-        date = now.strftime("%Y-%m-%d")  # canonical
-        hour_str = now.strftime("%H")  # Azure
+        date = now.format("YYYY-MM-DD")  # canonical
+        hour_str = now.format("HH")  # Azure
         hour_int = int(hour_str)  # Postgres
 
         try:
@@ -74,7 +75,7 @@ def transform_bronze_data(date: Optional[str] = None,
         status = "failed"
         raise
     finally:
-        duration = time.time() - start
+        duration = (pendulum.now("UTC") - start).in_seconds()
         # update FLOW_DURATION and PIPELINE_RUNNING for local use
         FLOW_DURATION.labels(flow_name).observe(duration)
         PIPELINE_RUNNING.labels(flow_name).set(0)

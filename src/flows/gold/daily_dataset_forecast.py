@@ -5,8 +5,8 @@ from prefect import flow
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.tasks.gold.extract_from_silver import get_silver_parquet_azure
-from src.tasks.gold.load_gold_data import load_gold_data_to_azure, \
-    load_gold_daily_data_to_postgres, load_gold_five_day_data_to_postgres
+from src.tasks.gold.load_gold_data import load_gold_daily_data_to_azure, \
+    load_gold_daily_data_to_postgres, load_gold_five_day_data_to_azure, load_gold_five_day_data_to_postgres
 from src.tasks.gold.transform_silver_data import get_daily_forecast_data, get_five_day_forecast_data
 
 
@@ -53,10 +53,11 @@ def daily_forecast(forecast_day=None, max_hour=None):  # possibly can pass old d
     daily_result = get_daily_forecast_data(silver_result, generated_at)
     five_day_result = get_five_day_forecast_data(silver_result, generated_at)
 
-    load_gold_data_to_azure(pipeline_name, daily_result)
+    load_gold_daily_data_to_azure(pipeline_name, daily_result)
     load_gold_daily_data_to_postgres(daily_result)
 
-    # load_gold_data_to_azure(pipeline_name, five_day_result)
+
+    load_gold_five_day_data_to_azure(pipeline_name, five_day_result)
     load_gold_five_day_data_to_postgres(five_day_result)
 
     # print first 5 rows vertically for dev logs
