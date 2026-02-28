@@ -46,7 +46,7 @@ deployments:
 
   - name: gold-five-day-forecast
     description: Local Prefect deployment for gold five day forecast flow
-    entrypoint: src/flows/gold/five_day_dataset_forecast.py:five_day_forecast
+    entrypoint: src/flows/gold/daily_summ_agg_data.py:five_day_forecast
     tags: [ local, portfolio ]
     parameters:
       debug: true

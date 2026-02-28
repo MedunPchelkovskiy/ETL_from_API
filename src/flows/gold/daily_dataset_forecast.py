@@ -33,7 +33,7 @@ def daily_forecast(forecast_day=None, max_hour=None):  # possibly can pass old d
 
     silver_result = []
     try:
-        # task вече връща list of tuples (hour, df) за пропуснатите часове
+        # task return list of tuples (hour, df) for missing hours
         silver_result = get_silver_parquet_azure(pipeline_name, forecast_day, max_hour)
     except ResourceNotFoundError as e:
         logger.info(

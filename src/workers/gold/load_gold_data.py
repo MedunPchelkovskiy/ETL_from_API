@@ -6,7 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.clients.datalake_client import fs_client
-from src.helpers.gold.load import upload_gold_bytes, update_last_processed_timestamp
+from src.helpers.gold.load import upload_gold_bytes, update_last_processed_timestamp, upload_daily_summ_bytes
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
@@ -264,3 +264,27 @@ def load_five_day_data_to_postgres_worker(fd_gold_results, engine):
         except SQLAlchemyError as e:
             logger.exception("Failed to load daily data: %s", e)
             raise
+
+
+
+def load_daily_summ_data_to_azure_worker(pipeline_name, gold_result: list):
+    """
+    Converts a Pandas DataFrame to Parquet bytes and uploads to Azure using the base uploader.
+    """
+    for ts, df in gold_result:
+        year_str = ts.format("YYYY")
+        month_str = ts.format("MM")
+        day_str = ts.format("DD")
+
+        year_folder_name = f"{year_str}"
+        month_folder_name = f"{month_str}"
+        day_file_name = f"{day_str}.parquet"
+        # Convert to Parquet bytes
+        parquet_buffer = io.BytesIO()
+        df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
+        parquet_bytes = parquet_buffer.getvalue()
+        upload_daily_summ_bytes(fs_client, config("BASE_DIR_DAILY_SUMM_GOLD"), year_folder_name, month_folder_name,
+                          day_file_name,
+                          parquet_bytes)
+        update_last_processed_timestamp(pipeline_name,
+                                        ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
