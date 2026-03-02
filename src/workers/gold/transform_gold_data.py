@@ -1,10 +1,8 @@
 import pandas as pd
 import pendulum
 
-from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
-
-def get_daily_summ_data_worker(gold_results: list) -> list[tuple]:
+def get_daily_summ_data_worker(gold_results: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> list[tuple[pendulum.DateTime, pd.DataFrame]]:
     gold_summ_results = []
 
     for ts, df in gold_results:
@@ -14,28 +12,27 @@ def get_daily_summ_data_worker(gold_results: list) -> list[tuple]:
             temp_max=('temp_max', 'max'),
             temp_min=('temp_min', 'min'),
             temp_avg=('temp_avg', 'mean'),
-            wind_speed_avg=('wind_speed', 'mean'),
-            wind_speed_max=('wind_speed', 'max'),
-            wind_speed_min=('wind_speed', 'min'),
-            rain_min=("rain", "min"),
-            rain_max=("rain", "max"),
-            rain_avg=("rain", "mean"),
-            snow_min=("snow", "min"),
-            snow_max=("snow", "max"),
-            snow_avg=("snow", "mean"),
-            cloud_cover_min=("clouds", "min"),
-            cloud_cover_max=("clouds", "max"),
-            cloud_cover_avg=("clouds", "mean"),
-            humidity_min=("humidity", "min"),
-            humidity_max=("humidity", "max"),
-            humidity_avg=("humidity", "mean"),
+            wind_speed_max=('wind_speed_max', 'max'),
+            wind_speed_min=('wind_speed_min', 'min'),
+            wind_speed_avg=('wind_speed_avg', 'mean'),
+            rain_max=("rain_max", "max"),
+            rain_min=("rain_min", "min"),
+            rain_avg=("rain_avg", "mean"),
+            snow_max=("snow_max", "max"),
+            snow_min=("snow_min", "min"),
+            snow_avg=("snow_avg", "mean"),
+            cloud_cover_max=("cloud_cover_max", "max"),
+            cloud_cover_min=("cloud_cover_min", "min"),
+            cloud_cover_avg=("cloud_cover_avg", "mean"),
+            humidity_max=("humidity_max", "max"),
+            humidity_min=("humidity_min", "min"),
+            humidity_avg=("humidity_avg", "mean"),
             ingest_date=('ingest_date', 'max'),
             ingest_hour=('ingest_hour', 'max'),
             forecast_date_utc=('forecast_date_utc', 'first'),
         ).reset_index().round(2)
         daily_summ_df["generated_at"] = pendulum.now("UTC")
 
-        gold_summ_results.append(daily_summ_df)
-
+        gold_summ_results.append((ts, daily_summ_df))
 
     return gold_summ_results

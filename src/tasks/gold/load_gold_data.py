@@ -1,3 +1,5 @@
+import pandas as pd
+import pendulum
 from decouple import config
 from prefect import runtime
 from prefect import task
@@ -5,7 +7,8 @@ from sqlalchemy import create_engine
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.gold.load_gold_data import load_gold_data_to_azure_worker, load_gold_daily_data_to_postgres_worker, \
-    load_five_day_data_to_postgres_worker, load_gold_five_day_data_to_azure_worker, load_daily_summ_data_to_azure_worker
+    load_five_day_data_to_postgres_worker, load_gold_five_day_data_to_azure_worker, \
+    load_daily_summ_data_to_azure_worker, load_gold_daily_summ_data_to_postgres_worker
 
 
 @task(name="Load gold daily data to Azure blob", retries=3, retry_delay_seconds=300)
@@ -79,7 +82,7 @@ def load_gold_five_day_data_to_postgres(fd_gold_result: list):
 
 
 
-@task(name="Load gold daily data to Azure blob", retries=3, retry_delay_seconds=300)
+@task(name="Load gold daily summarized data to Azure blob", retries=3, retry_delay_seconds=300)
 def load_gold_daily_summ_data_to_azure(pipeline_name, gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold data to Azure",
@@ -96,7 +99,21 @@ def load_gold_daily_summ_data_to_azure(pipeline_name, gold_result: list):
                        }
                 )
 
-
+@task(retries=3, retry_delay_seconds=300)
+def load_gold_daily_summ_data_to_postgres(gold_result: list[tuple[pendulum.DateTime, pd.DataFrame]]):
+    logger = get_logger()
+    logger.info("Start task loading gold daily summarized data to Postgres local",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,
+                       }
+                )
+    engine = create_engine(config("DB_CONN_RAW"))
+    load_gold_daily_summ_data_to_postgres_worker(gold_result, engine)
+    logger.info("Completed task loading gold daily summarized data to Postgres local",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,
+                       }
+                )
 
 
 

@@ -1,14 +1,23 @@
 from io import BytesIO
+from sqlite3 import OperationalError
 
 import pandas as pd
-from azure.core.exceptions import ResourceNotFoundError, HttpResponseError
+import pendulum
+import prefect
+from azure.core.exceptions import ResourceNotFoundError
 from decouple import config
+from prefect import task
+from sqlalchemy import create_engine
+from sqlalchemy.exc import DBAPIError, SQLAlchemyError
+
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.workers.gold.extract_silver_data import fetch_silver_data_postgres
 
 
-def get_hourly_blobs_for_today(year, month, day, fs_client) -> pd.DataFrame:
+def get_hourly_blobs_for_day(year, month, day, fs_client) -> pd.DataFrame:
     df = pd.DataFrame()
 
-    day_path = f"{config('BASE_DIR_GOLD')}/{year}/{month:02d}/{day:02d}"
+    day_path = f"{config('BASE_DIR_GOLD')}/{year}/{month}/{day}"
     directory_client = fs_client.get_directory_client(day_path)
     try:
         paths = list(directory_client.get_paths())
@@ -26,7 +35,7 @@ def get_hourly_blobs_for_today(year, month, day, fs_client) -> pd.DataFrame:
 
     dfs = []
     for file in files:
-        try:                                               # just safety check if file is deleted between listing and fetching
+        try:  # just safety check if file is deleted between listing and fetching
             file_client = fs_client.get_file_client(file)
             downloaded_bytes = file_client.download_file().readall()
         except ResourceNotFoundError:
@@ -37,3 +46,25 @@ def get_hourly_blobs_for_today(year, month, day, fs_client) -> pd.DataFrame:
 
     df = pd.concat(dfs, ignore_index=True)
     return df
+
+
+def get_hourly_data_postgres(date, engine, chunksize=100_000):
+    """
+    Fetch gold data from Postgres in chunks, sanitize UUIDs.
+
+    Raises ValueError if no data.
+    """
+    query = """
+          SELECT *
+            FROM gold_daily_forecast_data
+           WHERE ingest_date = %(date)s
+        ORDER BY ingest_date DESC;
+    """
+    chunks = []
+    for chunk in pd.read_sql(query, engine, params={"date": date}, chunksize=chunksize):
+        chunks.append(chunk)
+
+    if not chunks:
+        raise ValueError(f"No gold data found for {date}")
+
+    return pd.concat(chunks, ignore_index=True)

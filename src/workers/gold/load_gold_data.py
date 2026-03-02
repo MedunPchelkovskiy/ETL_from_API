@@ -1,6 +1,7 @@
 import io
 
 import pandas as pd
+import pendulum
 from decouple import config
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -271,6 +272,9 @@ def load_daily_summ_data_to_azure_worker(pipeline_name, gold_result: list):
     """
     Converts a Pandas DataFrame to Parquet bytes and uploads to Azure using the base uploader.
     """
+    logger = get_logger()
+    logger.info(f"type(gold_results) = {type(gold_result)}")
+    logger.info(f"gold_results sample = {gold_result[:1]}")
     for ts, df in gold_result:
         year_str = ts.format("YYYY")
         month_str = ts.format("MM")
@@ -288,3 +292,104 @@ def load_daily_summ_data_to_azure_worker(pipeline_name, gold_result: list):
                           parquet_bytes)
         update_last_processed_timestamp(pipeline_name,
                                         ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
+
+
+
+def load_gold_daily_summ_data_to_postgres_worker(gold_results: list[tuple[pendulum.DateTime, pd.DataFrame]], engine):
+    """
+    Loader for gold_daily_forecast_data using custom sanitizer.
+
+    """
+    logger = get_logger()
+
+    for ts, df in gold_results:
+        logger.info("DF shape: %s", df.shape)
+        logger.info("DF columns: %s", df.columns.tolist())
+
+        if df is None or df.empty:
+            logger.warning("Gold worker skip load: empty dataframe")
+            continue
+
+        # Ensure required columns
+        required_cols = [
+            "place_name", "ingest_date", "ingest_hour",
+            "forecast_date_utc", "forecast_hour_utc", "generated_at",
+            "temp_max", "temp_min", "temp_avg",
+            "rain_min", "rain_max", "rain_avg",
+            "snow_min", "snow_max", "snow_avg",
+            "wind_speed_min", "wind_speed_max", "wind_speed_avg",
+            "cloud_cover_min", "cloud_cover_max", "cloud_cover_avg",
+            "humidity_min", "humidity_max", "humidity_avg"
+        ]
+
+        for col in required_cols:
+            if col not in df.columns:
+                df[col] = None
+
+        # Your custom sanitizer
+        def _sanitize(records):
+            return [
+                {k: (None if v is pd.NaT or v == "NaT" else v) for k, v in row.items()}
+                for row in records
+            ]
+
+        stmt = """
+        INSERT INTO gold_daily_summarized_data (
+            place_name, ingest_date, ingest_hour,
+            forecast_date_utc, forecast_hour_utc, generated_at,
+            temp_max, temp_min, temp_avg,
+            rain_min, rain_max, rain_avg,
+            snow_min, snow_max, snow_avg,
+            wind_speed_min, wind_speed_max, wind_speed_avg,
+            cloud_cover_min, cloud_cover_max, cloud_cover_avg,
+            humidity_min, humidity_max, humidity_avg
+        ) VALUES (
+            :place_name, :ingest_date, :ingest_hour,
+            :forecast_date_utc, :forecast_hour_utc, :generated_at,
+            :temp_max, :temp_min, :temp_avg,
+            :rain_min, :rain_max, :rain_avg,
+            :snow_min, :snow_max, :snow_avg,
+            :wind_speed_min, :wind_speed_max, :wind_speed_avg,
+            :cloud_cover_min, :cloud_cover_max, :cloud_cover_avg,
+            :humidity_min, :humidity_max, :humidity_avg
+        )   
+        ON CONFLICT (place_name, forecast_date_utc) DO NOTHING
+        """
+
+        batch_size = 1000
+        total_inserted = 0
+        total_skipped = 0
+
+        try:
+            for start in range(0, len(df), batch_size):
+                batch = df.iloc[start:start + batch_size]
+                values = _sanitize(batch.to_dict(orient="records"))
+                print(df["generated_at"].unique())
+                print(len(df["generated_at"].unique()))
+                with engine.begin() as connection:
+                    result = connection.execute(text(stmt), values)
+                with engine.begin() as connection:
+                    count = connection.execute(
+                        text("SELECT COUNT(*) FROM gold_daily_forecast_data")
+                    ).scalar()
+
+                    print("TOTAL ROWS IN DB:", count)
+                    inserted = result.rowcount or 0
+                    skipped = len(values) - inserted
+
+                total_inserted += inserted
+                total_skipped += skipped
+
+                logger.info(
+                    "Batch %s loaded | inserted=%s | skipped=%s | total=%s",
+                    start // batch_size + 1, inserted, skipped, len(values)
+                )
+
+            logger.info(
+                "Daily data loaded successfully | total_inserted=%s | total_skipped=%s | total_rows=%s",
+                total_inserted, total_skipped, len(df)
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Failed to load daily data: %s", e)
+            raise

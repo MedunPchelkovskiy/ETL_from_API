@@ -1,3 +1,4 @@
+import uuid
 from io import BytesIO
 
 import pandas as pd

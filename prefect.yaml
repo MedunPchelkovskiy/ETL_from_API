@@ -44,13 +44,29 @@ deployments:
     work_pool:
       name: local-dev-process
 
-  - name: gold-five-day-forecast
-    description: Local Prefect deployment for gold five day forecast flow
-    entrypoint: src/flows/gold/daily_summ_agg_data.py:five_day_forecast
+  - name: gold-daily-summ-flow
+    description: Local Prefect deployment for gold daily summarized forecast flow
+    entrypoint: src/flows/gold/daily_summ_agg_data.py:hourly_to_daily_aggregation
+    schedule:
+      cron: "5 0 * * *"
+      timezone: UTC
     tags: [ local, portfolio ]
-    parameters:
-      debug: true
     concurrency_limit: 1
     work_pool:
       name: local-dev-process
+
+
+
+  - name: gold-weekly-summ-flow
+    description: Local Prefect deployment for gold weekly summarized forecast flow
+    entrypoint: src/flows/gold/weekly_summ_agg_data.py:daily_to_weekly_aggregation
+    schedule:
+      cron: "5 0 * * 1"
+      timezone: UTC
+    tags: [ local, portfolio ]
+    concurrency_limit: 1
+    work_pool:
+      name: local-dev-process
+
+
 
