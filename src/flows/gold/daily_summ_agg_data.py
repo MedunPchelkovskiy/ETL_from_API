@@ -29,6 +29,7 @@ def hourly_to_daily_aggregation(forecast_day=None):
     try:
         # task return list of tuples (day, df) for missing days
         gold_result = get_hourly_gold_azure(pipeline_name, forecast_day)
+        logger.info(f"Downloaded gold blob data, must be list of df's: {gold_result}")
     except ResourceNotFoundError as e:
         logger.info(
             f"No parquet files found for day {forecast_day.format('DD')}, fall back to postgres | error={e}",
@@ -37,7 +38,7 @@ def hourly_to_daily_aggregation(forecast_day=None):
                 "task_run_id": prefect.runtime.task_run.id
             })
         gold_result = get_hourly_gold_postgres(pipeline_name, forecast_day)
-    logger.info(f"Downloaded gold result data, must be list of df's: {gold_result}")
+        logger.info(f"Downloaded gold postgres data, must be list of df's: {gold_result}")
 
     if not gold_result:
         logger.info("No new Gold data to process. Skipping downstream tasks.")

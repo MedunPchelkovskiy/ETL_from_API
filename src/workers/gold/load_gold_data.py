@@ -336,7 +336,7 @@ def load_gold_daily_summ_data_to_postgres_worker(gold_results: list[tuple[pendul
         stmt = """
         INSERT INTO gold_daily_summarized_data (
             place_name, ingest_date, ingest_hour,
-            forecast_date_utc, forecast_hour_utc, generated_at,
+            forecast_date_utc, generated_at,
             temp_max, temp_min, temp_avg,
             rain_min, rain_max, rain_avg,
             snow_min, snow_max, snow_avg,
@@ -345,7 +345,7 @@ def load_gold_daily_summ_data_to_postgres_worker(gold_results: list[tuple[pendul
             humidity_min, humidity_max, humidity_avg
         ) VALUES (
             :place_name, :ingest_date, :ingest_hour,
-            :forecast_date_utc, :forecast_hour_utc, :generated_at,
+            :forecast_date_utc, :generated_at,
             :temp_max, :temp_min, :temp_avg,
             :rain_min, :rain_max, :rain_avg,
             :snow_min, :snow_max, :snow_avg,

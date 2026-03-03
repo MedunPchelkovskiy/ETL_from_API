@@ -37,13 +37,12 @@ def weather_flow_run(debug: bool = False):
         for label, payload in locations:
             # Call API
             # data = api_task(payload)
-            if isinstance(payload, str):
-                payload = (payload,)
-            state = api_task.submit(*payload, return_state=True)
+            call_args = (payload,) if isinstance(payload, str) else payload
+            state = api_task.submit(*call_args, return_state=True)
 
             if state.is_failed():
                 # 🔴 логваш, метрики, алерт и продължаваш
-                logger.warning(f"❌ Failed for {api_name} - {label}")      #TODO: change print with logger!!!
+                logger.warning(f"❌ Failed for {api_name} - {label}")
                 continue
 
             data = state.result()

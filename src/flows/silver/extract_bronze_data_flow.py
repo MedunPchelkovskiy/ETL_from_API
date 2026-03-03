@@ -19,7 +19,7 @@ from src.tasks.silver.transform_bronze_data_tasks import clean_silver, parse_api
 
 
 @flow(
-    flow_run_name=lambda: f"Extract bronze data for transformation flow - {pendulum.now("UTC").strftime('DD-MM-YYYY-HH:MM:SS')}"
+    flow_run_name=lambda: f"Extract bronze data for transformation flow - {pendulum.now('UTC').format('DD-MM-YYYY-HH:mm:ss')}"
     # Lambda give dynamically timestamp on every flow execution
 )
 def transform_bronze_data(date: Optional[str] = None,

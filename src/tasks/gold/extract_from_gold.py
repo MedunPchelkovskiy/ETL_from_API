@@ -32,7 +32,7 @@ def get_hourly_gold_azure(pipeline_name, forecast_day) -> list[tuple[pendulum.Da
 
     target_ts = forecast_day
 
-    if current_ts >= target_ts:
+    if current_ts > target_ts:
         logger.info("No new Gold files to process.")
         return []
 
