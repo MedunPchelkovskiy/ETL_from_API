@@ -134,3 +134,63 @@ def get_hourly_gold_postgres(pipeline_name, forecast_day):
         }
     )
     return result
+
+
+def get_daily_gold_azure(pipeline_name, forecast_day):
+    logger = get_logger()
+    logger.info("Start task get daily summ data from azure")
+
+    now = pendulum.now("UTC")
+    start_time = now
+
+    last_processed_ts = get_last_processed_timestamp(pipeline_name)
+    logger.info("Last processed TS: {}".format(last_processed_ts))
+
+    if last_processed_ts is None:
+        last_processed_ts = now.start_of("week")
+        current_ts = last_processed_ts.start_of("day")
+        logger.info("First run detected. Starting from beginning of week.")
+    else:
+        current_ts = last_processed_ts.start_of("day").add(days=1)
+
+    target_ts = forecast_day
+
+    if current_ts > target_ts:
+        logger.info("No new daily gold files to process.")
+        return []
+
+    result = []
+
+    while current_ts <= target_ts:
+
+        year = current_ts.format("YYYY")
+        month = current_ts.format("MM")
+        day = current_ts.format("DD")
+
+        logger.info(f"Processing daily gold blob {year}-{month}-{day}")
+
+        try:
+            all_hours_dfs = get_hourly_blobs_for_day(year, month, day, fs_client)
+
+            if all_hours_dfs.empty:
+                logger.warning(f"Empty Gold df for {year}-{month}-{day}")
+            else:
+                if len(all_hours_dfs) < 24:
+                    logger.warning(f"Missed {24 - len(all_hours_dfs)} Gold blobs for {year}-{month}-{day}.")
+                result.append((current_ts, all_hours_dfs))
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch Gold df for {year}-{month}-{day} | error={e}")
+
+        current_ts = current_ts.add(days=1)
+
+    duration = (pendulum.now("UTC") - start_time).total_seconds()
+
+    logger.info(
+        f"Finished incremental Gold download. "
+        f"Windows processed: {len(result)}. "
+        f"Duration: {duration:.2f}s"
+    )
+
+    return result
+
