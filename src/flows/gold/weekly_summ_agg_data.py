@@ -5,12 +5,18 @@ from prefect import flow
 from prefect.states import Completed
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.tasks.gold.extract_from_gold import get_daily_gold_azure
 
 
-@flow
-def daily_to_weekly_aggregation(forecast_day=None):
+@flow(name="Aggregate daily to weekly flow")
+def daily_to_weekly_aggregation(week_start=None):
     logger = get_logger()
     now = pendulum.now("UTC")
+
+    if week_start is None:
+        # Always deterministic: run Monday 00:05 → grab previous Mon–Sun
+        week_start = now.start_of("week").subtract(weeks=1)  # last Monday 00:00
+    week_end = week_start.end_of("week")  # last Sunday 23:59:59
     logger.info(f"Starting aggregate hourly to daily flow",
                 extra={
                     "flow_run_id": prefect.runtime.flow_run.id,
@@ -20,14 +26,9 @@ def daily_to_weekly_aggregation(forecast_day=None):
 
     pipeline_name = "Aggregate hourly to daily flow"
 
-    if forecast_day is None:
-        forecast_day = now.subtract(days=1).start_of("day")
-
-
-
     try:
         # task return list of tuples (day, df) for missing days
-        gold_result = get_daily_gold_azure(pipeline_name, forecast_day)
+        gold_result = get_daily_gold_azure(pipeline_name, week_start, week_end)
         logger.info(f"Downloaded gold blob data, must be list of df's: {gold_result}")
     except ResourceNotFoundError as e:
         logger.info(
