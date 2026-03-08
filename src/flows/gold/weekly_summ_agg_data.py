@@ -32,12 +32,12 @@ def daily_to_weekly_aggregation(week_start=None):
         logger.info(f"Downloaded gold blob data, must be list of df's: {gold_result}")
     except ResourceNotFoundError as e:
         logger.info(
-            f"No parquet files found for day {forecast_day.format('DD')}, fall back to postgres | error={e}",
+            f"No parquet files found for day {week_start.format('DD')}, fall back to postgres | error={e}",
             extra={
                 "flow_run_id": prefect.runtime.flow_run.id,
                 "task_run_id": prefect.runtime.task_run.id
             })
-        gold_result = get_daily_gold_postgres(pipeline_name, forecast_day)
+        gold_result = get_daily_gold_postgres(pipeline_name, week_start)
         logger.info(f"Downloaded gold postgres data, must be list of df's: {gold_result}")
 
     if not gold_result:

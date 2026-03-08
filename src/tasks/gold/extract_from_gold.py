@@ -145,40 +145,29 @@ def get_daily_gold_azure(pipeline_name, week_start, week_end):
     now = pendulum.now("UTC")
     start_time = now
 
-
-
-    logger.info(f"Fetching week: {week_start.to_date_string()} → {week_end.to_date_string()}")
-
-    # Build all 7 dates upfront — no incremental state needed
+    # Always deterministic: run Monday 00:05 → grab previous Mon–Sun
+    week_start = now.start_of("week").subtract(weeks=1)  # last Monday 00:00
+    week_end = week_start.end_of("week")  # last Sunday 23:59:59
     week_dates = [week_start.add(days=i) for i in range(7)]
 
-    result = []
+    all_days_df, missing_days = get_daily_blobs_for_week(week_dates, fs_client)
+    logger.info(f"Fetching week: {week_start.to_date_string()} → {week_end.to_date_string()}")
 
-    for current_ts in week_dates:
-        year = current_ts.format("YYYY")
-        month = current_ts.format("MM")
-        day = current_ts.format("DD")
+    if len(missing_days) > 3:
+        raise ValueError(
+            f"Too many missing days {len(missing_days)}/7."
+            f"Upstream flow might have failed"
+        )
 
-        logger.info(f"Fetching {year}-{month}-{day}")
-
-        try:
-            df = get_daily_blobs_for_week(week_start, week_end, fs_client)
-
-            if df.empty:
-                logger.warning(f"Empty DataFrame for {year}-{month}-{day}")
-            else:
-                result.append((current_ts, df))
-
-        except FileNotFoundError as e:
-            logger.warning(f"Blob missing for {year}-{month}-{day} | {e}")
-        except Exception as e:
-            logger.warning(f"Failed to fetch {year}-{month}-{day} | error={e}")
+    if missing_days:
+        logger.warning(f"Proceeding with {len(missing_days)}missing days, {missing_days}")
 
     duration = (pendulum.now("UTC") - start_time).total_seconds()
     logger.info(
-        f"Finished weekly download. "
-        f"Days fetched: {len(result)}/7. "
+        f"Finished fetching week days."
+        f"Days fetched: {7 - len(missing_days)}."
         f"Duration: {duration:.2f}s"
     )
 
-    return result
+
+    return all_days_df

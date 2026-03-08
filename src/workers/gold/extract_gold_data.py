@@ -70,17 +70,35 @@ def get_hourly_data_postgres(date, engine, chunksize=100_000):
     return pd.concat(chunks, ignore_index=True)
 
 
-def get_daily_blobs_for_week(week_start, week_end, fs_client) -> pd.DataFrame:
+def get_daily_blobs_for_week(week_dates, fs_client) -> tuple[pd.DataFrame, list[str]]:
     """Fetch a single d.parquet file from base_dir/y/m/d.parquet"""
-    # Always deterministic: run Monday 00:05 → grab previous Mon–Sun
-    week_start = now.start_of("week").subtract(weeks=1)  # last Monday 00:00
-    week_end = week_start.end_of("week")  # last Sunday 23:59:59
-    file_path = f"{config('BASE_DIR_WEEKLY_SUMM_GOLD')}/{year}/{month}/{day}.parquet"
-    file_client = fs_client.get_file_client(file_path)
+    logger = get_logger()
+    all_days_dfs = []
+    missing_days = []
 
-    try:
-        downloaded_bytes = file_client.download_file().readall()
-    except ResourceNotFoundError as e:
-        raise FileNotFoundError(f"Daily parquet not found: {file_path}") from e
+    for current_ts in week_dates:
+        year = current_ts.format("YYYY")
+        month = current_ts.format("MM")
+        day = current_ts.format("DD")
+        file_path = f"{config('BASE_DIR_WEEKLY_SUMM_GOLD')}/{year}/{month}/{day}.parquet"
 
-    return pd.read_parquet(BytesIO(downloaded_bytes))
+        try:
+            file_client = fs_client.get_file_client(file_path)
+            downloaded_bytes = file_client.download_file().readall()
+            df = pd.read_parquet(BytesIO(downloaded_bytes))
+
+            if df.empty:
+                logger.warning(f"Empty parquet for {year}-{month}-{day}, treating as missing")
+                missing_days.append(f"{year}-{month}-{day}")
+            else:
+                all_days_dfs.append(df)
+
+        except ResourceNotFoundError:
+            logger.warning(f"Blob not found: {file_path}")
+            missing_days.append(f"{year}-{month}-{day}")
+
+    combined = pd.concat(all_days_dfs) if all_days_dfs else pd.DataFrame()
+    return combined, missing_days
+
+
+
