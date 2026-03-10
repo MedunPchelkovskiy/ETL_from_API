@@ -96,7 +96,7 @@ def get_hourly_gold_postgres(pipeline_name, forecast_day):
 
     target_ts = forecast_day
 
-    if current_ts >= target_ts:
+    if current_ts > target_ts:
         logger.info("No new Gold files to process.")
         return []
 
@@ -137,37 +137,99 @@ def get_hourly_gold_postgres(pipeline_name, forecast_day):
     return result
 
 
-@task(name='get daily summ gold blobs')
-def get_daily_gold_azure(pipeline_name, week_start, week_end):
+@task(name="get daily summ gold blobs", retries=3, retry_delay_seconds=60)
+def  get_daily_gold_azure(week_start: pendulum.DateTime, week_end: pendulum.DateTime,
+                        ) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
+
     logger = get_logger()
-    logger.info("Start task: get last week daily data from Azure")
-
-    now = pendulum.now("UTC")
-    start_time = now
-
-    # Always deterministic: run Monday 00:05 → grab previous Mon–Sun
-    week_start = now.start_of("week").subtract(weeks=1)  # last Monday 00:00
-    week_end = week_start.end_of("week")  # last Sunday 23:59:59
+    start_time = pendulum.now("UTC")
     week_dates = [week_start.add(days=i) for i in range(7)]
 
-    all_days_df, missing_days = get_daily_blobs_for_week(week_dates, fs_client)
     logger.info(f"Fetching week: {week_start.to_date_string()} → {week_end.to_date_string()}")
 
-    if len(missing_days) > 3:
+    all_days_dfs, missing_days = get_daily_blobs_for_week(week_dates, fs_client)
+
+    logger.info(f"Weekly blobs — fetched: {len(all_days_dfs)}/7 days | missing: {missing_days}")
+
+    # ── quality gate — raise so Prefect retries ───────────────────
+    if len(missing_days) >= 3:
         raise ValueError(
-            f"Too many missing days {len(missing_days)}/7."
-            f"Upstream flow might have failed"
+            f"Too many missing days ({len(missing_days)}/7): {missing_days}. "
+            f"Upstream flow may have failed."
         )
 
     if missing_days:
-        logger.warning(f"Proceeding with {len(missing_days)}missing days, {missing_days}")
+        logger.warning(f"Proceeding with {len(missing_days)} missing day(s): {missing_days}")
 
     duration = (pendulum.now("UTC") - start_time).total_seconds()
     logger.info(
-        f"Finished fetching week days."
-        f"Days fetched: {7 - len(missing_days)}."
+        f"Finished fetching. "
+        f"Days fetched: {len(all_days_dfs)}/7. "
         f"Duration: {duration:.2f}s"
     )
 
+    return all_days_dfs, missing_days
 
-    return all_days_df
+
+# @task(name="get daily summ gold postgres")
+# def get_daily_gold_postgres(pipeline_name, forecast_day):
+#     logger = get_logger()
+#
+#     logger.info("Start task get silver days data from postgres",
+#                 extra={
+#                     "flow_run_id": prefect.runtime.flow_run.id,
+#                     "task_run_id": prefect.runtime.task_run.id
+#                 })
+#     now = pendulum.now("UTC")
+#     start_time = now
+#
+#     last_processed_ts = get_last_processed_timestamp(pipeline_name)
+#     logger.info("Last processed TS: {}".format(last_processed_ts))
+#
+#     if last_processed_ts is None:
+#         current_ts = now.start_of("week")
+#         logger.info("First run detected. Starting from beginning of week.")
+#     else:
+#         current_ts = last_processed_ts.start_of("day").add(days=1)
+#
+#     target_ts = forecast_day
+#
+#     if current_ts >= target_ts:
+#         logger.info("No new Gold files to process.")
+#         return []
+#
+#     result = []
+#     engine = create_engine(config("DB_CONN_RAW"))
+#
+#     while current_ts <= target_ts:
+#
+#         try:
+#             silver_df = get_hourly_data_postgres(current_ts.format('YYYY-MM-DD'), engine)
+#             result.append((current_ts, silver_df))
+#             current_ts = current_ts.add(days=1)
+#
+#         except OperationalError as e:
+#             logger.error(f"DB connection failed: {e}")
+#
+#         except DBAPIError as e:
+#             logger.error(f"DB query error: {e}")
+#
+#         except SQLAlchemyError as e:
+#             logger.error(f"SQLAlchemy error: {e}")
+#
+#         except Exception as e:
+#             logger.error(f"Unexpected error: {e}")
+#
+#     end = pendulum.now("UTC")
+#
+#     duration = (end - start_time).total_seconds()
+#
+#     logger.info(
+#         "Finished task get silver data postgres",
+#         extra={
+#             "flow_run_id": prefect.runtime.flow_run.id,
+#             "task_run_id": prefect.runtime.task_run.id,
+#             "Duration": f"{duration:.2f}s"
+#         }
+#     )
+#     return result

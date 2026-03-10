@@ -70,17 +70,20 @@ def get_hourly_data_postgres(date, engine, chunksize=100_000):
     return pd.concat(chunks, ignore_index=True)
 
 
-def get_daily_blobs_for_week(week_dates, fs_client) -> tuple[pd.DataFrame, list[str]]:
-    """Fetch a single d.parquet file from base_dir/y/m/d.parquet"""
+def get_daily_blobs_for_week(
+    week_dates: list[pendulum.DateTime],
+    fs_client,
+) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
+    """Fetch daily parquet files from base_dir/yyyy/mm/dd.parquet"""
     logger = get_logger()
-    all_days_dfs = []
-    missing_days = []
+    all_days_dfs: list[tuple[pendulum.DateTime, pd.DataFrame]] = []
+    missing_days: list[str] = []
 
     for current_ts in week_dates:
-        year = current_ts.format("YYYY")
+        year  = current_ts.format("YYYY")
         month = current_ts.format("MM")
-        day = current_ts.format("DD")
-        file_path = f"{config('BASE_DIR_WEEKLY_SUMM_GOLD')}/{year}/{month}/{day}.parquet"
+        day   = current_ts.format("DD")
+        file_path = f"{config('BASE_DIR_DAILY_SUMM_GOLD')}/{year}/{month}/{day}.parquet"
 
         try:
             file_client = fs_client.get_file_client(file_path)
@@ -91,14 +94,13 @@ def get_daily_blobs_for_week(week_dates, fs_client) -> tuple[pd.DataFrame, list[
                 logger.warning(f"Empty parquet for {year}-{month}-{day}, treating as missing")
                 missing_days.append(f"{year}-{month}-{day}")
             else:
-                all_days_dfs.append(df)
+                all_days_dfs.append((current_ts, df))
 
         except ResourceNotFoundError:
             logger.warning(f"Blob not found: {file_path}")
             missing_days.append(f"{year}-{month}-{day}")
 
-    combined = pd.concat(all_days_dfs) if all_days_dfs else pd.DataFrame()
-    return combined, missing_days
+    return all_days_dfs, missing_days
 
 
 
