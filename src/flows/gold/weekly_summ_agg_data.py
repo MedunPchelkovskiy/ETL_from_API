@@ -124,7 +124,7 @@ def daily_to_weekly_aggregation(week_start: Any = None):
 
     all_weeks_summ = get_weekly_summ_data(all_weeks)
 
-    load_gold_weekly_summ_data_to_azure(all_weeks_summ)
+    load_gold_weekly_summ_data_to_azure(pipeline_name, all_weeks_summ)
     # load_gold_weekly_summ_data_to_postgres(all_weeks_summ)
 
 

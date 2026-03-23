@@ -413,7 +413,7 @@ def load_weekly_summ_data_to_azure_worker(pipeline_name, week_start, df):
     parquet_buffer = io.BytesIO()
     df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
     parquet_bytes = parquet_buffer.getvalue()
-    upload_daily_summ_bytes(fs_client, config("BASE_DIR_DAILY_SUMM_GOLD"), year_folder_name, month_folder_name,
+    upload_daily_summ_bytes(fs_client, config("BASE_DIR_WEEKLY_SUMM_GOLD"), year_folder_name, month_folder_name,
                       day_file_name,
                       parquet_bytes)
     # update_last_processed_timestamp(pipeline_name,
