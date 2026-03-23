@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Any
+
 import pandas as pd
 import pendulum
 import prefect
@@ -8,12 +11,21 @@ from prefect.states import Completed
 from src.helpers.gold.extract import get_last_processed_timestamp
 from src.helpers.gold.load import update_last_processed_timestamp
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
-from src.tasks.gold.extract_from_gold import get_daily_gold_azure
+from src.tasks.gold.extract_from_gold import get_daily_gold_azure, get_daily_gold_postgres
+from src.tasks.gold.load_gold_data import load_gold_weekly_summ_data_to_azure
+from src.tasks.gold.transform_gold_data import get_weekly_summ_data
 
 
 @flow(name="Aggregate daily to weekly flow")
-def daily_to_weekly_aggregation(week_start: pendulum.DateTime = None):
+def daily_to_weekly_aggregation(week_start: Any = None):
     logger = get_logger()
+
+    # coerce whatever Prefect passes in
+    if isinstance(week_start, str):
+        week_start = pendulum.parse(week_start)
+    elif isinstance(week_start,     datetime):  # plain datetime from scheduler
+        week_start = pendulum.instance(week_start)
+
     now = pendulum.now("UTC")
     pipeline_name = "Aggregate daily to weekly flow"
 
@@ -56,7 +68,16 @@ def daily_to_weekly_aggregation(week_start: pendulum.DateTime = None):
         week_end = current_week_start.end_of("week")
         logger.info(f"Processing week: {current_week_start.to_date_string()} → {week_end.to_date_string()}")
 
-        all_days_dfs, missing_days = get_daily_gold_azure(current_week_start, week_end)
+        try:
+            all_days_dfs, missing_days = get_daily_gold_azure(current_week_start, week_end)
+        except ResourceNotFoundError as e:
+            logger.info(
+                f"No parquet file found for day  {current_week_start}.parquet, fall back to postgres | error={e}",
+            extra={
+                "flow_run_id": prefect.runtime.flow_run.id,
+                "task_run_id": prefect.runtime.task_run.id
+            })
+            all_days_dfs, missing_days = get_daily_gold_postgres(current_week_start, week_end)
 
         # ── missing days gate ─────────────────────────────────────
         if len(missing_days) > 3:
@@ -84,8 +105,8 @@ def daily_to_weekly_aggregation(week_start: pendulum.DateTime = None):
         else:
             logger.warning(f"No data at all for week {current_week_start.to_date_string()}, skipping.")
 
-        update_last_processed_timestamp(pipeline_name, current_week_start)
-        logger.info(f"Week {current_week_start.to_date_string()} marked as processed.")
+        update_last_processed_timestamp(pipeline_name, current_week_start)               #TODO: update time stamp after success processing, instead of just fetching!!!
+        logger.info(f"Week {current_week_start.to_date_string()} marked as processed.")  #TODO: update time stamp after success processing, instead of just fetching!!!
 
         current_week_start = current_week_start.add(weeks=1)
 
@@ -101,29 +122,22 @@ def daily_to_weekly_aggregation(week_start: pendulum.DateTime = None):
         logger.warning("No weeks collected for downstream processing.")
         return Completed(message="Skipped-NoNewData")
 
-    for week_start, days in all_weeks.items():
-        logger.info(f"Aggregating week {week_start.to_date_string()} — {len(days)} days")
-        pass
-        # weekly_summary = get_weekly_summ_data(days)
-        # load_gold_weekly_summ_data_to_azure(pipeline_name, weekly_summary)
-        # load_gold_weekly_summ_data_to_postgres(weekly_summary)
+    all_weeks_summ = get_weekly_summ_data(all_weeks)
+
+    load_gold_weekly_summ_data_to_azure(all_weeks_summ)
+    # load_gold_weekly_summ_data_to_postgres(all_weeks_summ)
 
 
-        # daily_to_weekly_aggregation(week_start=pendulum.datetime(2026, 2, 24))  # manual reprocess
 
-        # daily_summ_result = get_weekly_summ_data(gold_result)
-        #
-        # load_gold_weekly_summ_data_to_azure(pipeline_name, daily_summ_result)
-        # load_gold_weekly_summ_data_to_postgres(daily_summ_result)
-        #
-        # # print first 5 rows vertically for dev logs
-        # for i, (ts, df) in enumerate(daily_summ_result[:5]):
-        #     logger.info("\nItem %s timestamp: %s", i, ts)
-        #     logger.info(
-        #         "\nItem %s dataframe (first row vertical):\n%s",
-        #         i,
-        #         df.iloc[0].to_frame().to_string() if not df.empty else "Empty DataFrame"
-        #     )
+
+    # # print first 5 rows vertically for dev logs
+    # for i, (ts, df) in enumerate(daily_summ_result[:5]):
+    #     logger.info("\nItem %s timestamp: %s", i, ts)
+    #     logger.info(
+    #         "\nItem %s dataframe (first row vertical):\n%s",
+    #         i,
+    #         df.iloc[0].to_frame().to_string() if not df.empty else "Empty DataFrame"
+    #     )
 
     logger.info(
         f"Finished {pipeline_name}",

@@ -393,3 +393,28 @@ def load_gold_daily_summ_data_to_postgres_worker(gold_results: list[tuple[pendul
         except SQLAlchemyError as e:
             logger.exception("Failed to load daily data: %s", e)
             raise
+
+
+def load_weekly_summ_data_to_azure_worker(pipeline_name, week_start, df):
+    """
+    Converts a Pandas DataFrame to Parquet bytes and uploads to Azure using the base uploader.
+    """
+    logger = get_logger()
+
+
+    year_str = week_start.format("YYYY")
+    month_str = week_start.format("MM")
+    day_str = week_start.format("DD")
+
+    year_folder_name = f"{year_str}"
+    month_folder_name = f"{month_str}"
+    day_file_name = f"{day_str}.parquet"
+    # Convert to Parquet bytes
+    parquet_buffer = io.BytesIO()
+    df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
+    parquet_bytes = parquet_buffer.getvalue()
+    upload_daily_summ_bytes(fs_client, config("BASE_DIR_DAILY_SUMM_GOLD"), year_folder_name, month_folder_name,
+                      day_file_name,
+                      parquet_bytes)
+    # update_last_processed_timestamp(pipeline_name,
+    #                                 ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
