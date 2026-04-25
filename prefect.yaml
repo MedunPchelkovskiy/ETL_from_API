@@ -1,5 +1,9 @@
-prefect-version: "3.*"
+#prefect-version: "3.*"
 name: etl_from_api
+
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: "{{ $PWD }}"
 
 deployments:
   - name: Orchestrator-Deployment
@@ -8,6 +12,8 @@ deployments:
     schedule: # optional, can remove if you want manual runs
       cron: "11 * * * *"
       timezone: Europe/Sofia
+    catchup: false
+    concurrency_limit: 1
     work_pool:
       name: local-dev-process
 
@@ -15,9 +21,10 @@ deployments:
   - name: bronze-flow
     description: Local Prefect deployment for bronze layer
     entrypoint: src/flows/bronze/extract_data_for_ski_resorts_in_Bulgaria_flow.py:weather_flow_run
+    schedule: null
     tags: [local, portfolio]
-    parameters:
-      debug: true
+#    parameters:
+#      debug: true
     concurrency_limit: 1
     work_pool:
       name: local-dev-process
@@ -26,9 +33,10 @@ deployments:
   - name: silver-flow
     description: Local Prefect deployment for silver layer
     entrypoint: src/flows/silver/extract_bronze_data_flow.py:transform_bronze_data
+    schedule: null
     tags: [ local, portfolio ]
-    parameters:
-      debug: true
+#    parameters:
+#      debug: true
     concurrency_limit: 1
     work_pool:
       name: local-dev-process
@@ -37,9 +45,10 @@ deployments:
   - name: gold-flow
     description: Local Prefect deployment for gold forecast layer
     entrypoint: src/flows/gold/daily_dataset_forecast.py:daily_forecast
+    schedule: null
     tags: [ local, portfolio ]
-    parameters:
-      debug: true
+#    parameters:
+#      debug: true
     concurrency_limit: 1
     work_pool:
       name: local-dev-process
