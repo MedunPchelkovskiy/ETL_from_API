@@ -38,14 +38,20 @@ def weather_flow_run(debug: bool = False):
             # Call API
             # data = api_task(payload)
             call_args = (payload,) if isinstance(payload, str) else payload
-            state = api_task.submit(*call_args, return_state=True)
+            future = api_task.submit(*call_args)
 
-            if state.is_failed():
-                # 🔴 логваш, метрики, алерт и продължаваш
-                logger.warning(f"❌ Failed for {api_name} - {label}")
+            try:
+                data = future.result()  # ← wait for done + throw error on fail
+            except Exception as e:
+                logger.warning(f"X Failed for {api_name} - {label}: {e}")
                 continue
 
-            data = state.result()
+            # if state.is_failed():
+            #     # 🔴 loggings, metrics, alerts and continue
+            #     logger.warning(f"❌ Failed for {api_name} - {label}")
+            #     continue
+            #
+            # data = state.result()
 
             # Build human-readable folder/file names
             folder_name = f"{date_str}_{api_name}_{label}"

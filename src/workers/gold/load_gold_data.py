@@ -418,3 +418,7 @@ def load_weekly_summ_data_to_azure_worker(pipeline_name, week_start, df):
                       parquet_bytes)
     # update_last_processed_timestamp(pipeline_name,
     #                                 ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
+
+
+def load_weekly_summ_data_to_postgres_worker():
+    pass
