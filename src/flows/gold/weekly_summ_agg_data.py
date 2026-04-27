@@ -23,7 +23,7 @@ def daily_to_weekly_aggregation(week_start: Any = None):
     # coerce whatever Prefect passes in
     if isinstance(week_start, str):
         week_start = pendulum.parse(week_start)
-    elif isinstance(week_start, datetime):  # plain datetime from scheduler
+    elif isinstance(week_start,     datetime):  # plain datetime from scheduler
         week_start = pendulum.instance(week_start)
 
     now = pendulum.now("UTC")
@@ -73,10 +73,10 @@ def daily_to_weekly_aggregation(week_start: Any = None):
         except ResourceNotFoundError as e:
             logger.info(
                 f"No parquet file found for day  {current_week_start}.parquet, fall back to postgres | error={e}",
-                extra={
-                    "flow_run_id": prefect.runtime.flow_run.id,
-                    "task_run_id": prefect.runtime.task_run.id
-                })
+            extra={
+                "flow_run_id": prefect.runtime.flow_run.id,
+                "task_run_id": prefect.runtime.task_run.id
+            })
             all_days_dfs, missing_days = get_daily_gold_postgres(current_week_start, week_end)
 
         # ── missing days gate ─────────────────────────────────────
@@ -105,10 +105,8 @@ def daily_to_weekly_aggregation(week_start: Any = None):
         else:
             logger.warning(f"No data at all for week {current_week_start.to_date_string()}, skipping.")
 
-        update_last_processed_timestamp(pipeline_name,
-                                        current_week_start)  # TODO: update time stamp after success processing, instead of just fetching!!!
-        logger.info(
-            f"Week {current_week_start.to_date_string()} marked as processed.")  # TODO: update time stamp after success processing, instead of just fetching!!!
+        update_last_processed_timestamp(pipeline_name, current_week_start)               #TODO: update time stamp after success processing, instead of just fetching!!!
+        logger.info(f"Week {current_week_start.to_date_string()} marked as processed.")  #TODO: update time stamp after success processing, instead of just fetching!!!
 
         current_week_start = current_week_start.add(weeks=1)
 
@@ -128,6 +126,9 @@ def daily_to_weekly_aggregation(week_start: Any = None):
 
     load_gold_weekly_summ_data_to_azure(pipeline_name, all_weeks_summ)
     # load_gold_weekly_summ_data_to_postgres(all_weeks_summ)
+
+
+
 
     # # print first 5 rows vertically for dev logs
     # for i, (ts, df) in enumerate(daily_summ_result[:5]):
@@ -151,3 +152,4 @@ if __name__ == "__main__":
     # now = pendulum.now("UTC")
     # daily_to_weekly_aggregation(now.start_of("week").subtract(weeks=1))
     daily_to_weekly_aggregation()
+

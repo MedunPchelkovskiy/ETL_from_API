@@ -9,7 +9,7 @@ from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.gold.load_gold_data import load_gold_data_to_azure_worker, load_gold_daily_data_to_postgres_worker, \
     load_five_day_data_to_postgres_worker, load_gold_five_day_data_to_azure_worker, \
     load_daily_summ_data_to_azure_worker, load_gold_daily_summ_data_to_postgres_worker, \
-    load_weekly_summ_data_to_azure_worker, load_weekly_summ_data_to_postgres_worker
+    load_weekly_summ_data_to_azure_worker
 
 
 @task(name="Load gold daily data to Azure blob", retries=3, retry_delay_seconds=300)
@@ -65,7 +65,7 @@ def load_gold_five_day_data_to_azure(pipeline_name, gold_result: list):
                 )
 
 
-@task(name="Load five day summary to postgres", retries=3, retry_delay_seconds=300)
+@task(retries=3, retry_delay_seconds=300)
 def load_gold_five_day_data_to_postgres(fd_gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold five day data to Postgres local",
@@ -82,7 +82,8 @@ def load_gold_five_day_data_to_postgres(fd_gold_result: list):
                 )
 
 
-@task(name="Load gold daily summary to Azure blob", retries=3, retry_delay_seconds=300)
+
+@task(name="Load gold daily summarized data to Azure blob", retries=3, retry_delay_seconds=300)
 def load_gold_daily_summ_data_to_azure(pipeline_name, gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold data to Azure",
@@ -99,8 +100,7 @@ def load_gold_daily_summ_data_to_azure(pipeline_name, gold_result: list):
                        }
                 )
 
-
-@task(name="Load gold daily summary to postgres", retries=3, retry_delay_seconds=300)
+@task(retries=3, retry_delay_seconds=300)
 def load_gold_daily_summ_data_to_postgres(gold_result: list[tuple[pendulum.DateTime, pd.DataFrame]]):
     logger = get_logger()
     logger.info("Start task loading gold daily summarized data to Postgres local",
@@ -117,7 +117,7 @@ def load_gold_daily_summ_data_to_postgres(gold_result: list[tuple[pendulum.DateT
                 )
 
 
-@task(name="Load gold weekly summary to Azure blob", retries=3, retry_delay_seconds=300)
+@task(name="Load gold weekly summarized data to Azure blob", retries=3, retry_delay_seconds=300)
 def load_gold_weekly_summ_data_to_azure(pipeline_name, all_weeks_summ: list[tuple[pendulum.DateTime, pd.DataFrame]]):
     logger = get_logger()
     logger.info("Start task loading gold weekly data to Azure",
@@ -135,17 +135,7 @@ def load_gold_weekly_summ_data_to_azure(pipeline_name, all_weeks_summ: list[tupl
                 )
 
 
-def load_gold_weekly_summ_data_to_postgres(all_weeks_summ: list[tuple[pendulum.DateTime, pd.DataFrame]]):
-    logger = get_logger()
-    logger.info("Start task loading gold weekly data to Postgres local",
-                extra={"flow_run_id": runtime.flow_run.id,
-                       "task_run_id": runtime.task_run.id, }
-                )
 
-    engine = create_engine(config("DB_CONN_RAW"))
-    load_weekly_summ_data_to_postgres_worker()
 
-    logger.info("Completed task loading gold weekly data to Postgres local",
-                extra={"flow_run_id": runtime.flow_run.id,
-                       "task_run_id": runtime.task_run.id, }
-                )
+
+
