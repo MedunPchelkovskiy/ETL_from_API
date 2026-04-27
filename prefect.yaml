@@ -1,9 +1,9 @@
 #prefect-version: "3.*"
 name: etl_from_api
 
-#pull:
-#  - prefect.deployments.steps.set_working_directory:
-#      directory: "{{ $PWD }}"
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: "{{ $PWD }}"
 
 deployments:
   - name: Orchestrator-Deployment
