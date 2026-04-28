@@ -135,6 +135,22 @@ def load_gold_weekly_summ_data_to_azure(pipeline_name, all_weeks_summ: list[tupl
                 )
 
 
+def load_gold_weekly_summ_data_to_postgres(pipeline_name, all_weeks_summ: list[tuple[pendulum.DateTime, pd.DataFrame]]):
+    logger = get_logger()
+    logger.info("Start task loading gold weekly data to Postgres local",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,
+                       }
+                )
+    for week_start, df in all_weeks_summ:
+        load_weekly_summ_data_to_azure_worker(pipeline_name, week_start, df)
+
+    logger.info("Completed task loading gold weekly data to Postgres local",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,
+                       }
+                )
+
 
 
 

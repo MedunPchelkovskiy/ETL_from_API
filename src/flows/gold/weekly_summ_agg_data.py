@@ -10,6 +10,7 @@ from prefect.states import Completed
 
 from src.helpers.gold.extract import get_last_processed_timestamp
 from src.helpers.gold.load import update_last_processed_timestamp
+from src.helpers.gold.pendulum_date_parser import ensure_pendulum
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.tasks.gold.extract_from_gold import get_daily_gold_azure, get_daily_gold_postgres
 from src.tasks.gold.load_gold_data import load_gold_weekly_summ_data_to_azure
@@ -20,11 +21,12 @@ from src.tasks.gold.transform_gold_data import get_weekly_summ_data
 def daily_to_weekly_aggregation(week_start: Any = None):
     logger = get_logger()
 
-    # coerce whatever Prefect passes in
-    if isinstance(week_start, str):
-        week_start = pendulum.parse(week_start)
-    elif isinstance(week_start,     datetime):  # plain datetime from scheduler
-        week_start = pendulum.instance(week_start)
+    week_start = ensure_pendulum(week_start)
+    # # coerce whatever Prefect passes in
+    # if isinstance(week_start, str):
+    #     week_start = pendulum.parse(week_start)
+    # elif isinstance(week_start,     datetime):  # plain datetime from scheduler
+    #     week_start = pendulum.instance(week_start)
 
     now = pendulum.now("UTC")
     pipeline_name = "Aggregate daily to weekly flow"
@@ -47,12 +49,12 @@ def daily_to_weekly_aggregation(week_start: Any = None):
         else:
             current_week_start = last_processed.add(weeks=1)
     else:
-        current_week_start = week_start
+        current_week_start = week_start.start_of('week')
 
-    target_week_start = now.start_of("week").subtract(weeks=1)
+    last_full_week_start = now.start_of("week").subtract(weeks=1)
 
     # ── early exit ────────────────────────────────────────────────
-    if current_week_start > target_week_start:
+    if current_week_start > last_full_week_start:
         logger.info(
             f"No unprocessed weeks. "
             f"Last processed: {last_processed.to_date_string() if last_processed else 'None'}. "
@@ -64,7 +66,7 @@ def daily_to_weekly_aggregation(week_start: Any = None):
     all_weeks: dict[pendulum.DateTime, list[tuple[pendulum.DateTime, pd.DataFrame]]] = {}
     problematic_weeks: list[str] = []
 
-    while current_week_start <= target_week_start:
+    while current_week_start <= last_full_week_start:
         week_end = current_week_start.end_of("week")
         logger.info(f"Processing week: {current_week_start.to_date_string()} → {week_end.to_date_string()}")
 
