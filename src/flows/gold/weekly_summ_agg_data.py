@@ -47,7 +47,7 @@ def daily_to_weekly_aggregation(week_start: Any = None):
             current_week_start = now.start_of("week").subtract(weeks=1)
             logger.info("First run detected. Starting from last week.")
         else:
-            current_week_start = last_processed.add(weeks=1)
+            current_week_start = last_processed.add(weeks=1).start_of("week")
     else:
         current_week_start = week_start.start_of('week')
 
@@ -124,7 +124,18 @@ def daily_to_weekly_aggregation(week_start: Any = None):
         logger.warning("No weeks collected for downstream processing.")
         return Completed(message="Skipped-NoNewData")
 
-    all_weeks_summ = get_weekly_summ_data(all_weeks)
+    futures = []
+
+    for wk_start, days in all_weeks.items():
+        futures.append(get_weekly_summ_data.submit(wk_start, days))
+    all_weeks_summ = []
+
+    for f in futures:
+        try:
+            all_weeks_summ.append(f.result())
+        except Exception as e:
+            logger.warning(f"Skipping failed week: {e}")
+    rows = len(all_weeks_summ)
 
     load_gold_weekly_summ_data_to_azure(pipeline_name, all_weeks_summ)
     # load_gold_weekly_summ_data_to_postgres(all_weeks_summ)

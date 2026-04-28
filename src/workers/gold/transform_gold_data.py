@@ -39,12 +39,11 @@ def get_daily_summ_data_worker(gold_results: list[tuple[pendulum.DateTime, pd.Da
 
 
 
-def get_weekly_summ_data_worker(week_start, days: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> tuple[pendulum.DateTime, pd.DataFrame]:
-    gold_summ_results = []
+def get_weekly_summ_data_worker(week_start, days: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> pd.DataFrame:
     not_empty_df = [df for ts, df in days if not df.empty]
 
-    if not not_empty_df:
-        return []
+    if len(not_empty_df) < 4:
+        raise ValueError(f"Not enough data for week {week_start}, only {len(not_empty_df)} days")
 
     combined_df = pd.concat(not_empty_df, ignore_index=True)
 
@@ -71,8 +70,7 @@ def get_weekly_summ_data_worker(week_start, days: list[tuple[pendulum.DateTime, 
         ingest_hour=('ingest_hour', 'max'),
         forecast_date_utc=('forecast_date_utc', 'first'),
     ).reset_index().round(2)
+    weekly_summ_df["week_start"] = week_start
     weekly_summ_df["generated_at"] = pendulum.now("UTC")
 
-    gold_summ_results.append((week_start, weekly_summ_df))
-
-    return week_start, weekly_summ_df
+    return weekly_summ_df

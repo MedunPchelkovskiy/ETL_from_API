@@ -7,7 +7,8 @@ from src.workers.gold.transform_gold_data import get_daily_summ_data_worker, get
 
 
 @task(name="Transform gold data to daily")
-def get_daily_summ_data(gold_results: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> list[tuple[pendulum.DateTime, pd.DataFrame]]:
+def get_daily_summ_data(gold_results: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> list[
+    tuple[pendulum.DateTime, pd.DataFrame]]:
     logger = get_logger()
     logger.info(f"Start task get daily forecast data", extra={})
 
@@ -18,16 +19,15 @@ def get_daily_summ_data(gold_results: list[tuple[pendulum.DateTime, pd.DataFrame
     return daily_summ_data
 
 
-
 @task(name="Transform gold data to daily")
-def get_weekly_summ_data(all_weeks: dict[pendulum.DateTime, list[tuple[pendulum.DateTime, pd.DataFrame]]]) -> list[tuple[pendulum.DateTime, pd.DataFrame]]:
+def get_weekly_summ_data(week_start: pendulum.DateTime,
+                         days: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> pd.DataFrame:
     logger = get_logger()
-    logger.info(f"Start task get daily forecast data", extra={})
-    summ_weeks = []
-    for week_start, days in all_weeks.items():
-        weekly_summ_data = get_weekly_summ_data_worker(week_start, days)
-        summ_weeks.append(weekly_summ_data)
-    rows = len(summ_weeks)     # must be count of weeks for processing!?!
-
-    logger.info(f"End task get daily forecast data", extra={"processed weeks": rows})
-    return summ_weeks
+    logger.info(f"Start task get weekly summ data")
+    try:
+        curr_week_df = get_weekly_summ_data_worker(week_start, days)
+        logger.info(f"End task get weekly summ data")
+        return curr_week_df
+    except Exception:
+        logger.exception(f"Failed processing week {week_start}")
+        raise
