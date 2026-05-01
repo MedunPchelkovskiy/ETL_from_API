@@ -2,7 +2,8 @@ import pandas as pd
 import pendulum
 
 
-def get_daily_summ_data_worker(gold_results: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> list[tuple[pendulum.DateTime, pd.DataFrame]]:
+def get_daily_summ_data_worker(gold_results: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> list[
+    tuple[pendulum.DateTime, pd.DataFrame]]:
     gold_summ_results = []
 
     for ts, df in gold_results:
@@ -38,7 +39,6 @@ def get_daily_summ_data_worker(gold_results: list[tuple[pendulum.DateTime, pd.Da
     return gold_summ_results
 
 
-
 def get_weekly_summ_data_worker(week_start, days: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> pd.DataFrame:
     not_empty_df = [df for ts, df in days if not df.empty]
 
@@ -66,10 +66,9 @@ def get_weekly_summ_data_worker(week_start, days: list[tuple[pendulum.DateTime, 
         humidity_max=("humidity_max", "max"),
         humidity_min=("humidity_min", "min"),
         humidity_avg=("humidity_avg", "mean"),
-        ingest_date=('ingest_date', 'max'),
-        ingest_hour=('ingest_hour', 'max'),
-        forecast_date_utc=('forecast_date_utc', 'first'),
     ).reset_index().round(2)
+    weekly_summ_df["week_number"] = week_start.week_of_year
+    weekly_summ_df["year"] = week_start.year
     weekly_summ_df["week_start"] = week_start
     weekly_summ_df["generated_at"] = pendulum.now("UTC")
 

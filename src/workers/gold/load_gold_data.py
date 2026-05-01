@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.clients.datalake_client import fs_client
-from src.helpers.gold.load import upload_gold_bytes, update_last_processed_timestamp, upload_daily_summ_bytes
+from src.helpers.gold.load import update_last_processed_timestamp, upload_parquet_bytes
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
@@ -29,9 +29,9 @@ def load_gold_data_to_azure_worker(pipeline_name, gold_result: list):
         parquet_buffer = io.BytesIO()
         df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
         parquet_bytes = parquet_buffer.getvalue()
-        upload_gold_bytes(fs_client, config("BASE_DIR_GOLD"), year_folder_name, month_folder_name,
-                          day_folder_name,
-                          file_name, parquet_bytes)
+        upload_parquet_bytes(fs_client, config("BASE_DIR_GOLD"), [year_folder_name, month_folder_name,
+                                                                  day_folder_name,
+                                                                  file_name], parquet_bytes)
         update_last_processed_timestamp(pipeline_name,
                                         ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
 
@@ -156,10 +156,11 @@ def load_gold_five_day_data_to_azure_worker(pipeline_name, gold_result: list):
         parquet_buffer = io.BytesIO()
         df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
         parquet_bytes = parquet_buffer.getvalue()
-        upload_gold_bytes(fs_client, config("BASE_DIR_FIVE_DAY_GOLD"), year_folder_name, month_folder_name,
-                          day_folder_name,
-                          file_name, parquet_bytes)
-        update_last_processed_timestamp(pipeline_name, ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
+        upload_parquet_bytes(fs_client, config("BASE_DIR_FIVE_DAY_GOLD"), [year_folder_name, month_folder_name,
+                                                                           day_folder_name,
+                                                                           file_name], parquet_bytes)
+        update_last_processed_timestamp(pipeline_name,
+                                        ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
 
 
 def load_five_day_data_to_postgres_worker(fd_gold_results, engine):
@@ -267,7 +268,6 @@ def load_five_day_data_to_postgres_worker(fd_gold_results, engine):
             raise
 
 
-
 def load_daily_summ_data_to_azure_worker(pipeline_name, gold_result: list):
     """
     Converts a Pandas DataFrame to Parquet bytes and uploads to Azure using the base uploader.
@@ -287,12 +287,11 @@ def load_daily_summ_data_to_azure_worker(pipeline_name, gold_result: list):
         parquet_buffer = io.BytesIO()
         df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
         parquet_bytes = parquet_buffer.getvalue()
-        upload_daily_summ_bytes(fs_client, config("BASE_DIR_DAILY_SUMM_GOLD"), year_folder_name, month_folder_name,
-                          day_file_name,
-                          parquet_bytes)
+        upload_parquet_bytes(fs_client, config("BASE_DIR_DAILY_SUMM_GOLD"), [year_folder_name, month_folder_name,
+                                                                             day_file_name],
+                             parquet_bytes)
         update_last_processed_timestamp(pipeline_name,
                                         ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
-
 
 
 def load_gold_daily_summ_data_to_postgres_worker(gold_results: list[tuple[pendulum.DateTime, pd.DataFrame]], engine):
@@ -356,7 +355,7 @@ def load_gold_daily_summ_data_to_postgres_worker(gold_results: list[tuple[pendul
         ON CONFLICT (place_name, forecast_date_utc) DO NOTHING
         """
 
-        batch_size = 1000
+        batch_size = int(1000)
         total_inserted = 0
         total_skipped = 0
 
@@ -401,20 +400,92 @@ def load_weekly_summ_data_to_azure_worker(pipeline_name, week_start, df):
     """
     logger = get_logger()
 
-
     year_str = week_start.format("YYYY")
-    month_str = week_start.format("MM")
-    day_str = week_start.format("DD")
+    week_number = week_start.format('WW')
 
     year_folder_name = f"{year_str}"
-    month_folder_name = f"{month_str}"
-    day_file_name = f"{day_str}.parquet"
+    day_file_name = f"W{week_number}.parquet"
     # Convert to Parquet bytes
     parquet_buffer = io.BytesIO()
     df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
     parquet_bytes = parquet_buffer.getvalue()
-    upload_daily_summ_bytes(fs_client, config("BASE_DIR_WEEKLY_SUMM_GOLD"), year_folder_name, month_folder_name,
-                      day_file_name,
-                      parquet_bytes)
+    upload_parquet_bytes(fs_client, config("BASE_DIR_WEEKLY_SUMM_GOLD"), [year_folder_name,
+                                                                          day_file_name],
+                         parquet_bytes)
     # update_last_processed_timestamp(pipeline_name,
     #                                 ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
+
+
+def load_gold_weekly_summ_data_to_postgres_worker(
+        engine,
+        all_weeks_summ: list[pd.DataFrame],
+):
+    """
+    Loader for gold_weekly_summarized_data.
+    Expects pre-validated DataFrames from the Gold layer.
+    Demonstrates batch INSERT with ON CONFLICT for portfolio scalability showcase.
+    """
+    logger = get_logger()
+
+    stmt = text("""
+        INSERT INTO gold_weekly_summarized_data (
+            place_name, generated_at,
+            week_number, year, week_start,
+            temp_max, temp_min, temp_avg,
+            rain_min, rain_max, rain_avg,
+            snow_min, snow_max, snow_avg,
+            wind_speed_min, wind_speed_max, wind_speed_avg,
+            cloud_cover_min, cloud_cover_max, cloud_cover_avg,
+            humidity_min, humidity_max, humidity_avg
+        ) VALUES (
+            :place_name, :generated_at,
+            :week_number, :year, :week_start,
+            :temp_max, :temp_min, :temp_avg,
+            :rain_min, :rain_max, :rain_avg,
+            :snow_min, :snow_max, :snow_avg,
+            :wind_speed_min, :wind_speed_max, :wind_speed_avg,
+            :cloud_cover_min, :cloud_cover_max, :cloud_cover_avg,
+            :humidity_min, :humidity_max, :humidity_avg
+        )
+        ON CONFLICT (place_name, year, week_number) DO NOTHING
+    """)
+
+    batch_size = int(1000)
+
+    for df in all_weeks_summ:
+        if df is None or df.empty:
+            logger.warning("Gold weekly summ worker skip load: empty dataframe")
+            continue
+        ts = df['week_number']
+
+        logger.info("Loading week number ts%s | shape=%s", ts, df.shape)
+
+        total_inserted = 0
+        total_skipped = 0
+
+        try:
+            for start in range(0, len(df), batch_size):
+                batch = df.iloc[start : start + batch_size]
+                values = batch.to_dict(orient="records")
+
+                with engine.begin() as conn:
+                    result = conn.execute(stmt, values)
+                    inserted = result.rowcount or 0
+
+                skipped = len(values) - inserted
+                total_inserted += inserted
+                total_skipped += skipped
+
+                logger.info(
+                    "Batch %s | inserted=%s | skipped=%s | size=%s",
+                    start // batch_size + 1, inserted, skipped, len(values),
+                )
+
+            logger.info(
+                "Done ts=%s | total_inserted=%s | total_skipped=%s | total_rows=%s",
+                ts, total_inserted, total_skipped, len(df),
+            )
+
+        except SQLAlchemyError:
+            logger.exception("Failed to load weekly summ data for week ts=%s", ts)
+            raise

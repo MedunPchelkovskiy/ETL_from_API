@@ -32,14 +32,15 @@ def upload_gold_bytes(fs_client, base_dir, year_folder_name, month_folder_name, 
     return {"uploaded": True, "path": f"{directory_path}/{file_name}", "reason": "created"}
 
 
-def upload_daily_summ_bytes(fs_client, base_dir, year_folder_name, month_folder_name, day_file_name,
-                      parquet_bytes):
+def upload_parquet_bytes(fs_client, base_dir, path_parts,
+                         parquet_bytes):
     """
     Generic uploader: uploads a bytes object to Azure Data Lake.
     Handles directory creation and existence checks.
     Returns dict with upload result.
     """
-    directory_path = f"{base_dir}/{year_folder_name}/{month_folder_name}"
+    *folders, file_name = path_parts
+    directory_path = "/".join([base_dir] + folders)
     directory_client = fs_client.get_directory_client(directory_path)
 
     # Ensure directory exists
@@ -49,16 +50,16 @@ def upload_daily_summ_bytes(fs_client, base_dir, year_folder_name, month_folder_
         pass
 
     # File client
-    file_client = directory_client.get_file_client(day_file_name)
+    file_client = directory_client.get_file_client(file_name)
     if file_client.exists():
-        return {"uploaded": False, "path": f"{directory_path}/{day_file_name}", "reason": "already_exists"}
+        return {"uploaded": False, "path": f"{directory_path}/{file_name}", "reason": "already_exists"}
 
     # Upload
     file_client.create_file()
     file_client.append_data(data=parquet_bytes, offset=0, length=len(parquet_bytes))
     file_client.flush_data(len(parquet_bytes))
 
-    return {"uploaded": True, "path": f"{directory_path}/{day_file_name}", "reason": "created"}
+    return {"uploaded": True, "path": f"{directory_path}/{file_name}", "reason": "created"}
 
 
 def update_last_processed_timestamp(pipeline_name: str, new_timestamp):
