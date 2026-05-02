@@ -402,7 +402,7 @@ def load_weekly_summ_data_to_azure_worker(pipeline_name, week):
 
     week_number = int(week["week_number"].iloc[0])
     year_str = str(week["year"].iloc[0])
-    file_name = f"W{week_number}.parquet"
+    file_name = f"W{week_number:02d}.parquet"
     # Convert to Parquet bytes
     parquet_buffer = io.BytesIO()
     week.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")

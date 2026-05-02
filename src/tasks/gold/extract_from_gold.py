@@ -138,24 +138,16 @@ def get_hourly_gold_postgres(pipeline_name, forecast_day):
 
 
 @task(name="get daily summ gold blobs", retries=3, retry_delay_seconds=60)
-def get_daily_gold_azure(week_start: pendulum.DateTime, week_end: pendulum.DateTime,
+def get_daily_gold_azure(week_dates: list[pendulum.DateTime],
                          ) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
     logger = get_logger()
     start_time = pendulum.now("UTC")
-    week_dates = [week_start.add(days=i) for i in range(7)]
 
-    logger.info(f"Fetching week: {week_start.to_date_string()} → {week_end.to_date_string()}")
+    logger.info(f"Fetching week: {week_dates[0]} → {week_dates[-1]}")      #TODO: eventually f"{week_dates[0].to_date_string()} → {week_dates[-1].to_date_string()}" if log is not only date
 
     all_days_dfs, missing_days = get_daily_blobs_for_week(week_dates, fs_client)
 
     logger.info(f"Weekly blobs — fetched: {len(all_days_dfs)}/7 days | missing: {missing_days}")
-
-    # ── quality gate — raise so Prefect retries ───────────────────
-    if len(missing_days) >= 4:
-        raise ValueError(
-            f"Too many missing days ({len(missing_days)}/7): {missing_days}. "
-            f"Upstream flow may have failed."
-        )
 
     if missing_days:
         logger.warning(f"Proceeding with {len(missing_days)} missing day(s): {missing_days}")
@@ -168,14 +160,26 @@ def get_daily_gold_azure(week_start: pendulum.DateTime, week_end: pendulum.DateT
     )
 
     return all_days_dfs, missing_days
+#
+# @task(name="Extract daily gold blobs", retries=3, retry_delay_seconds=60)
+# def task_get_daily_gold_azure(
+#         week_dates: list[pendulum.DateTime],
+# ) -> tuple[list[tuple[pendulum.DateTime, object]], list[str]]:
+#     """
+#     Fetches daily parquet files from Azure for the given week_dates.
+#     Retries on infrastructure errors (connection, timeout).
+#     Missing days are returned — NOT raised — business logic lives in flow.
+#     """
+#     logger = get_logger()
+#     logger.info(f"Fetching {len(week_dates)} days from Azure")
+#     return get_daily_blobs_for_week(week_dates, fs_client)
 
 
 @task(name="get daily summ gold postgres")
-def get_daily_gold_postgres(week_start: pendulum.DateTime, week_end: pendulum.DateTime,
+def get_daily_gold_postgres(week_dates: list[pendulum.DateTime],
                             ) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
     logger = get_logger()
     start_time = pendulum.now("UTC")
-    week_dates = [week_start.add(days=i) for i in range(7)]
 
     logger.info("Start task get daily summ gold postgres",
                 extra={
@@ -185,18 +189,11 @@ def get_daily_gold_postgres(week_start: pendulum.DateTime, week_end: pendulum.Da
 
     engine = create_engine(config("DB_CONN_RAW"))
 
-    logger.info(f"Fetching week: {week_start.to_date_string()} → {week_end.to_date_string()}")
+    logger.info(f"Fetching week: {week_dates[0]} → {week_dates[-1]}")
 
     all_days_dfs, missing_days = get_daily_data_postgres(week_dates, engine)
 
     logger.info(f"Weekly records — fetched: {len(all_days_dfs)}/7 days | missing: {missing_days}")
-
-    # ── quality gate — raise so Prefect retries ───────────────────
-    if len(missing_days) >= 4:
-        raise ValueError(
-            f"Too many missing days ({len(missing_days)}/7): {missing_days}. "
-            f"Upstream flow may have failed."
-        )
 
     if missing_days:
         logger.warning(f"Proceeding with {len(missing_days)} missing day(s): {missing_days}")
@@ -209,3 +206,16 @@ def get_daily_gold_postgres(week_start: pendulum.DateTime, week_end: pendulum.Da
     )
 
     return all_days_dfs, missing_days
+
+# @task(name="Extract daily gold postgres")
+# def task_get_daily_gold_postgres(
+#         week_dates: list[pendulum.DateTime],
+#         engine,
+# ) -> tuple[list[tuple[pendulum.DateTime, object]], list[str]]:
+#     """
+#     Fetches daily data from Postgres for the given week_dates.
+#     Fallback when Azure fails.
+#     """
+#     logger = get_logger()
+#     logger.info(f"Fetching {len(week_dates)} days from Postgres")
+#     return get_daily_data_postgres(week_dates, engine)

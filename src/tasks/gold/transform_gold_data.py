@@ -19,11 +19,12 @@ def get_daily_summ_data(gold_results: list[tuple[pendulum.DateTime, pd.DataFrame
     return daily_summ_data
 
 
-@task(name="Transform gold data to daily")
+@task(name="Transform gold data to weekly")
 def get_weekly_summ_data(week_start: pendulum.DateTime,
                          days: list[tuple[pendulum.DateTime, pd.DataFrame]]) -> pd.DataFrame:
     logger = get_logger()
     logger.info(f"Start task get weekly summ data")
+    logger.info(f"Transforming week {week_start.to_date_string()}")
     try:
         curr_week_df = get_weekly_summ_data_worker(week_start, days)
         logger.info(f"End task get weekly summ data")

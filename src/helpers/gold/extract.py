@@ -20,8 +20,8 @@ def get_last_gold_timestamp_postgres(engine, table_name):
 
 def get_last_processed_timestamp(pipeline_name: str) -> Optional[pendulum.DateTime]:
     """
-    Връща последния успешно обработен timestamp за даден pipeline.
-    Ако няма запис, връща None.
+    Return last successfully processed timestamp for the pipeline.
+    If not records, return None.
     """
     conn = psycopg2.connect(config("DB_CONN_RAW"))
     try:
