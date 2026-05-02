@@ -394,24 +394,22 @@ def load_gold_daily_summ_data_to_postgres_worker(gold_results: list[tuple[pendul
             raise
 
 
-def load_weekly_summ_data_to_azure_worker(pipeline_name, week_start, df):
+def load_weekly_summ_data_to_azure_worker(pipeline_name, week):
     """
     Converts a Pandas DataFrame to Parquet bytes and uploads to Azure using the base uploader.
     """
     logger = get_logger()
 
-    year_str = week_start.format("YYYY")
-    week_number = week_start.format('WW')
-
-    year_folder_name = f"{year_str}"
-    day_file_name = f"W{week_number}.parquet"
+    week_number = int(week["week_number"].iloc[0])
+    year_str = str(week["year"].iloc[0])
+    file_name = f"W{week_number}.parquet"
     # Convert to Parquet bytes
     parquet_buffer = io.BytesIO()
-    df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
+    week.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
     parquet_bytes = parquet_buffer.getvalue()
-    upload_parquet_bytes(fs_client, config("BASE_DIR_WEEKLY_SUMM_GOLD"), [year_folder_name,
-                                                                          day_file_name],
-                         parquet_bytes)
+    upload_parquet_bytes(fs_client, config("BASE_DIR_WEEKLY_SUMM_GOLD"), [year_str,
+                                                                                   file_name],
+                                                                                   parquet_bytes)
     # update_last_processed_timestamp(pipeline_name,
     #                                 ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
 
@@ -456,9 +454,13 @@ def load_gold_weekly_summ_data_to_postgres_worker(
         if df is None or df.empty:
             logger.warning("Gold weekly summ worker skip load: empty dataframe")
             continue
-        ts = df['week_number']
+        week_number = df['week_number'].iloc[0]
+        year = df['year'].iloc[0]
 
-        logger.info("Loading week number ts%s | shape=%s", ts, df.shape)
+        logger.info(
+            "Loading week number %s-%s | shape=%s",
+            year, week_number, df.shape
+        )
 
         total_inserted = 0
         total_skipped = 0
@@ -482,10 +484,10 @@ def load_gold_weekly_summ_data_to_postgres_worker(
                 )
 
             logger.info(
-                "Done ts=%s | total_inserted=%s | total_skipped=%s | total_rows=%s",
-                ts, total_inserted, total_skipped, len(df),
+                "Done week number %s | total_inserted=%s | total_skipped=%s | total_rows=%s",
+                week_number, total_inserted, total_skipped, len(df),
             )
 
         except SQLAlchemyError:
-            logger.exception("Failed to load weekly summ data for week ts=%s", ts)
+            logger.exception("Failed to load weekly summ data for week number %s", week_number)
             raise

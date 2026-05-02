@@ -51,7 +51,6 @@ deployments:
       cron: "5 0 * * *"
       timezone: UTC
     tags: [ local, portfolio ]
-    concurrency_limit: 1
     work_pool:
       name: local-dev-process
 
@@ -64,7 +63,6 @@ deployments:
       cron: "5 0 * * 1"
       timezone: UTC
     tags: [ local, portfolio ]
-    concurrency_limit: 1
     work_pool:
       name: local-dev-process
 

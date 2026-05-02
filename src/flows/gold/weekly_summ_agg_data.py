@@ -106,10 +106,10 @@ def daily_to_weekly_aggregation(week_start: Any = None):
         else:
             logger.warning(f"No data at all for week {current_week_start.to_date_string()}, skipping.")
 
-        update_last_processed_timestamp(pipeline_name,
-                                        current_week_start)  # TODO: update time stamp after success processing, instead of just fetching!!!
-        logger.info(
-            f"Week {current_week_start.to_date_string()} marked as processed.")  # TODO: update time stamp after success processing, instead of just fetching!!!
+        # update_last_processed_timestamp(pipeline_name,
+        #                                 current_week_start)  # TODO: update time stamp after success processing, instead of just fetching!!!
+        # logger.info(
+        #     f"Week {current_week_start.to_date_string()} marked as processed.")  # TODO: update time stamp after success processing, instead of just fetching!!!
 
         current_week_start = current_week_start.add(weeks=1)
 
@@ -139,9 +139,32 @@ def daily_to_weekly_aggregation(week_start: Any = None):
 
     # ── downstream loading per week ────────────────────────────
 
+    errors = []
+
     for week in all_weeks_summ:
-        load_gold_weekly_summ_data_to_azure(pipeline_name, week)
-    load_gold_weekly_summ_data_to_postgres(all_weeks_summ)
+        try:
+            load_gold_weekly_summ_data_to_azure(pipeline_name, week)
+        except Exception as e:
+            logger.exception("Azure upload failed for week=%s year=%s",
+                             week["week_number"].iloc[0], week["year"].iloc[0])
+            errors.append(("azure", week["week_number"].iloc[0], e))
+
+    try:
+        load_gold_weekly_summ_data_to_postgres(pipeline_name, all_weeks_summ)
+    except Exception as e:
+        logger.exception("Postgres load failed")
+        errors.append(("postgres", None, e))
+
+    if errors:
+        raise RuntimeError(f"Load completed with {len(errors)} error(s): {errors}")
+
+
+
+    # for week in all_weeks_summ:
+    #     load_gold_weekly_summ_data_to_azure(pipeline_name, week)
+    # load_gold_weekly_summ_data_to_postgres(all_weeks_summ)
+
+
 
     # # print first 5 rows vertically for dev logs
     # for i, (ts, df) in enumerate(daily_summ_result[:5]):
