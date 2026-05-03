@@ -66,5 +66,16 @@ deployments:
     work_pool:
       name: local-dev-process
 
+#TODO: Make this deployment after develop pipeline
+#  - name: gold-monthly-summ-flow
+#    description: Local Prefect deployment for gold monthly summarized weather data flow
+#    entrypoint: src/flows/gold/monthly_summ_agg_data.py:weekly_to_monthly_aggregation
+#    schedule:
+#      cron: "9 0 1 * *"
+#      timezone: UTC
+#    tags: [ local, portfolio ]
+#    work_pool:
+#      name: local-dev-process
+
 
 

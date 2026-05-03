@@ -37,6 +37,15 @@ PIPELINE_CONFIG = {
         "postgres_date_col": "week_start",
         "max_retries": 3,
     },
+    "gold_monthly": {
+        "grain": "month",
+        "expected_count": 12,
+        "source_check": "azure+postgres",
+        "azure_path_env":    "BASE_DIR_MONTHLY_SUMM_GOLD",  # year/W{week_number}.parquet
+        "postgres_table":    "gold_monthly_summarized_data",
+        "postgres_date_col": "month_start",
+        "max_retries": 3,
+    },
 }
 
 PIPELINE_STATUS_MAP = {

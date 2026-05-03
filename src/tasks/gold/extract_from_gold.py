@@ -219,3 +219,26 @@ def get_daily_gold_postgres(week_dates: list[pendulum.DateTime],
 #     logger = get_logger()
 #     logger.info(f"Fetching {len(week_dates)} days from Postgres")
 #     return get_daily_data_postgres(week_dates, engine)
+
+
+@task(name="get daily summ gold blobs", retries=3, retry_delay_seconds=60)
+def get_daily_gold_azure(week_dates: list[pendulum.DateTime],
+                         ) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
+    logger = get_logger()
+    start_time = pendulum.now("UTC")
+
+    logger.info(f"Fetching week: {week_dates[0]} → {week_dates[-1]}")      #TODO: eventually f"{week_dates[0].to_date_string()} → {week_dates[-1].to_date_string()}" if log is not only date
+
+    all_days_dfs, missing_days = get_daily_blobs_for_week(week_dates, fs_client)
+
+    logger.info(f"Weekly blobs — fetched: {len(all_days_dfs)}/7 days | missing: {missing_days}")
+
+    if missing_days:
+        logger.warning(f"Proceeding with {len(missing_days)} missing day(s): {missing_days}")
+
+    duration = (pendulum.now("UTC") - start_time).total_seconds()
+    logger.info(
+        f"Finished fetching. "
+        f"Days fetched: {len(all_days_dfs)}/7. "
+        f"Duration: {duration:.2f}s"
+    )
