@@ -13,17 +13,17 @@ from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, P
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_daily_gold_azure, get_daily_gold_postgres
+from src.tasks.gold.transform_gold_data import get_monthly_summ_data
 
 PIPELINE_NAME = "gold_monthly"
-MAX_MISSING_DAYS = 5
-MAX_MISSING_RATIO = 0.15
 
 @flow(name="Aggregate weekly to monthly flow")
-def weekly_to_monthly_aggregation():
+def daily_to_monthly_aggregation():
     logger = get_logger()
     now = pendulum.now("UTC")
     engine = create_engine(config("DB_CONN_RAW"))
     cfg = PIPELINE_CONFIG[PIPELINE_NAME]
+    max_missing_ratio = cfg["max_missing_ratio"]
 
     logger.info(
         f"Starting {PIPELINE_NAME}",
@@ -111,7 +111,7 @@ def weekly_to_monthly_aggregation():
                 continue
 
         # ── missing days gate ─────────────────────────────────────────────────
-        max_missing = round(month_start.days_in_month * MAX_MISSING_RATIO)  # динамично
+        max_missing = round(month_start.days_in_month * max_missing_ratio)  # динамично
 
         if len(missing_days) > max_missing:
             current_retries = get_current_retry_count(PIPELINE_NAME, month_start)
@@ -154,7 +154,7 @@ def weekly_to_monthly_aggregation():
             )
         # ── transform ─────────────────────────────────────────────────────────
         try:
-            monthly_summ = get_monthly_summ_data(month_start, all_days_dfs)
+            monthly_summ = get_monthly_summ_data(month_start, all_days_dfs, max_missing_ratio)
         except ValueError as e:
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,

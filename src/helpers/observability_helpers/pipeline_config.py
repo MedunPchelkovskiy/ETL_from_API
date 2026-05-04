@@ -39,9 +39,10 @@ PIPELINE_CONFIG = {
     },
     "gold_monthly": {
         "grain": "month",
-        "expected_count": 12,
+        "max_missing_ratio": 0.15,
+        # "expected_count": 12,
         "source_check": "azure+postgres",
-        "azure_path_env":    "BASE_DIR_MONTHLY_SUMM_GOLD",  # year/W{week_number}.parquet
+        "azure_path_env":    "BASE_DIR_MONTHLY_SUMM_GOLD",  # year/MM.parquet
         "postgres_table":    "gold_monthly_summarized_data",
         "postgres_date_col": "month_start",
         "max_retries": 3,
