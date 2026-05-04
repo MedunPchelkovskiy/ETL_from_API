@@ -88,13 +88,13 @@ def weekly_to_monthly_aggregation():
         )
         # ── extract: Azure first, Postgres fallback ───────────────────────────
         try:
-            all_months_dfs, missing_weeks = get_weekly_gold_azure(month_weeks)
+            all_weeks_dfs, missing_weeks = get_weekly_gold_azure(month_weeks)
         except Exception as e:
             logger.warning(
                 f"[{PIPELINE_NAME}] Azure failed for {month_label}, falling back to Postgres | {e}"
             )
             try:
-                all_months_dfs, missing_weeks = get_weekly_gold_postgres(month_weeks)
+                all_weeks_dfs, missing_weeks = get_weekly_gold_postgres(month_weeks)
             except Exception as e2:
                 logger.error(
                     f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}"
@@ -153,14 +153,14 @@ def weekly_to_monthly_aggregation():
 
         # ── transform ─────────────────────────────────────────────────────────
         try:
-            monthly_summ = get_monthly_summ_data(month_start, all_months_dfs)
+            monthly_summ = get_monthly_summ_data(month_start, all_weeks_dfs)
         except ValueError as e:
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
                 partition_date=month_start,
                 status="failed",
                 expected_count=cfg["expected_count"],
-                actual_count=len(all_months_dfs),
+                actual_count=len(all_weeks_dfs),
                 error_type="insufficient_data",
                 error_message=str(e),
             )
@@ -172,7 +172,7 @@ def weekly_to_monthly_aggregation():
                 partition_date=month_start,
                 status="failed",
                 expected_count=cfg["expected_count"],
-                actual_count=len(all_months_dfs),
+                actual_count=len(all_weeks_dfs),
                 error_type="transformation_error",
                 error_message=str(e),
             )
@@ -235,7 +235,7 @@ def weekly_to_monthly_aggregation():
 
     if failed_months:
         raise RuntimeError(
-            f"[{PIPELINE_NAME}] {len(failed_months)} week(s) failed: {failed_months}"
+            f"[{PIPELINE_NAME}] {len(failed_months)} month(s) failed: {failed_months}"
         )
 
 if __name__ == "__main__":
