@@ -21,7 +21,7 @@ def generate_dates(start_date, end_date, grain: str ) -> List[pendulum.DateTime]
 
     current = start_date
 
-    while current < end_date:        # TODO note that end_date is excluded!!!!!
+    while current < end_date:        # TODO: note that end_date is excluded!!!!!
         dates.append(current)
         if grain == "hour":
             current = current.add(hours=1)

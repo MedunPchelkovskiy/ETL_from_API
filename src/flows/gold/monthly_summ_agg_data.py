@@ -12,9 +12,11 @@ from src.helpers.observability_helpers.initial_run_states import generate_dates
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
     upsert_state_fn, get_current_retry_count
+from src.tasks.gold.extract_from_gold import get_daily_gold_azure, get_daily_gold_postgres
 
 PIPELINE_NAME = "gold_monthly"
-MAX_MISSING_WEEKS = 1
+MAX_MISSING_DAYS = 5
+MAX_MISSING_RATIO = 0.15
 
 @flow(name="Aggregate weekly to monthly flow")
 def weekly_to_monthly_aggregation():
@@ -31,18 +33,15 @@ def weekly_to_monthly_aggregation():
         },
     )
 
-    year_start = pendulum.datetime(now.year, 1, 4).start_of("month")
-    end_date = now.start_of("month")  # current month excluded to be sure processing full month (<, not <=)
+    now = pendulum.now("UTC")
+    end_date = now.start_of("month")  # текущият месец excluded
 
-    # ── reconcile: always run, only for new partitions ────────────────────────
     last_reconciled = get_last_reconciled_date(PIPELINE_NAME)
 
     if last_reconciled is None:
-        # first run — reconcile from start of year
-        reconcile_start = year_start
-        logger.info(f"[{PIPELINE_NAME}] First run — reconciling from {year_start.to_date_string()}")
+        reconcile_start = pendulum.datetime(now.year - 1, 1, 1)
+        logger.info(f"[{PIPELINE_NAME}] First run — reconciling from {reconcile_start.to_date_string()}")
     else:
-        # subsequent runs — reconcile only new months since last known partition
         reconcile_start = last_reconciled
         logger.info(
             f"[{PIPELINE_NAME}] Reconciling from {reconcile_start.to_date_string()} "
@@ -77,7 +76,7 @@ def weekly_to_monthly_aggregation():
 
     for month_start in pending_months:
         month_label = month_start.to_date_string()
-        month_weeks = generate_dates(month_start, month_start.add(weeks=1), grain="week")
+        month_days = generate_dates(month_start, month_start.add(months=1), grain="day")
 
         # mark as processing — prevents duplicate runs
         upsert_state_fn(
@@ -88,13 +87,13 @@ def weekly_to_monthly_aggregation():
         )
         # ── extract: Azure first, Postgres fallback ───────────────────────────
         try:
-            all_weeks_dfs, missing_weeks = get_weekly_gold_azure(month_weeks)
+            all_days_dfs, missing_days = get_daily_gold_azure(month_days)
         except Exception as e:
             logger.warning(
                 f"[{PIPELINE_NAME}] Azure failed for {month_label}, falling back to Postgres | {e}"
             )
             try:
-                all_weeks_dfs, missing_weeks = get_weekly_gold_postgres(month_weeks)
+                all_days_dfs, missing_days = get_daily_gold_postgres(month_days)
             except Exception as e2:
                 logger.error(
                     f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}"
@@ -111,15 +110,17 @@ def weekly_to_monthly_aggregation():
                 failed_months.append(month_label)
                 continue
 
-        # ── missing weeks gate ─────────────────────────────────────────────────
-        if len(missing_weeks) > MAX_MISSING_WEEKS:
+        # ── missing days gate ─────────────────────────────────────────────────
+        max_missing = round(month_start.days_in_month * MAX_MISSING_RATIO)  # динамично
+
+        if len(missing_days) > max_missing:
             current_retries = get_current_retry_count(PIPELINE_NAME, month_start)
 
             if current_retries >= cfg["max_retries"]:
                 status = "abandoned"
                 error_message = (
                     f"Abandoned after {current_retries} retries — "
-                    f"no source data available. Missing weeks: {missing_weeks}"
+                    f"no source data available. Missing days: {missing_days}"  # ← days не weeks
                 )
                 logger.error(
                     f"[{PIPELINE_NAME}] Month {month_label} abandoned after "
@@ -127,40 +128,40 @@ def weekly_to_monthly_aggregation():
                 )
             else:
                 status = "pending"
-                error_message = f"Missing weeks: {missing_weeks}"
+                error_message = f"Missing days: {missing_days}"  # ← days не weeks
                 logger.warning(
-                    f"[{PIPELINE_NAME}] Month {month_label} — {len(missing_weeks)}/4 missing weeks "
-                    f"retry {current_retries + 1}/{cfg['max_retries']}"
+                    f"[{PIPELINE_NAME}] Month {month_label} — "
+                    f"{len(missing_days)}/{month_start.days_in_month} missing days "  # ← не /4
+                    f"| retry {current_retries + 1}/{cfg['max_retries']}"
                 )
 
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
                 partition_date=month_start,
                 status=status,
-                expected_count=cfg["expected_count"],
-                actual_count=7 - len(missing_weeks),
+                expected_count=month_start.days_in_month,  # ← динамично, не cfg
+                actual_count=month_start.days_in_month - len(missing_days),  # ← не 7 -
                 error_type="missing_partitions",
                 error_message=error_message,
             )
             skipped_months.append(month_label)
             continue
 
-        if missing_weeks:
+        if missing_days:
             logger.warning(
                 f"[{PIPELINE_NAME}] Month {month_label} — proceeding with "
-                f"{len(missing_weeks)} missing weeks(s): {missing_weeks}"
+                f"{len(missing_days)} missing day(s): {missing_days}"  # ← days не weeks
             )
-
         # ── transform ─────────────────────────────────────────────────────────
         try:
-            monthly_summ = get_monthly_summ_data(month_start, all_weeks_dfs)
+            monthly_summ = get_monthly_summ_data(month_start, all_days_dfs)
         except ValueError as e:
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
                 partition_date=month_start,
                 status="failed",
                 expected_count=cfg["expected_count"],
-                actual_count=len(all_weeks_dfs),
+                actual_count=len(all_days_dfs),
                 error_type="insufficient_data",
                 error_message=str(e),
             )
@@ -172,7 +173,7 @@ def weekly_to_monthly_aggregation():
                 partition_date=month_start,
                 status="failed",
                 expected_count=cfg["expected_count"],
-                actual_count=len(all_weeks_dfs),
+                actual_count=len(all_days_dfs),
                 error_type="transformation_error",
                 error_message=str(e),
             )
