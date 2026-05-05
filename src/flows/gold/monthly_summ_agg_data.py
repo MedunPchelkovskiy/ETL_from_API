@@ -13,6 +13,7 @@ from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, P
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_daily_gold_azure, get_daily_gold_postgres
+from src.tasks.gold.load_gold_data import load_gold_monthly_summ_data_to_azure
 from src.tasks.gold.transform_gold_data import get_monthly_summ_data
 
 PIPELINE_NAME = "gold_monthly"

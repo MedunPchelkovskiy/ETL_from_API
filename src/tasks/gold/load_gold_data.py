@@ -9,7 +9,8 @@ from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.gold.load_gold_data import load_gold_data_to_azure_worker, load_gold_daily_data_to_postgres_worker, \
     load_five_day_data_to_postgres_worker, load_gold_five_day_data_to_azure_worker, \
     load_daily_summ_data_to_azure_worker, load_gold_daily_summ_data_to_postgres_worker, \
-    load_weekly_summ_data_to_azure_worker, load_gold_weekly_summ_data_to_postgres_worker
+    load_weekly_summ_data_to_azure_worker, load_gold_weekly_summ_data_to_postgres_worker, \
+    load_monthly_summ_data_to_azure_worker
 
 
 @task(name="Load gold daily data to Azure blob", retries=3, retry_delay_seconds=300)
@@ -145,6 +146,25 @@ def load_gold_weekly_summ_data_to_postgres(pipeline_name, all_weeks_summ: list[p
     load_gold_weekly_summ_data_to_postgres_worker(engine, all_weeks_summ)
 
     logger.info("Completed task loading gold weekly data to Postgres local",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,
+                       }
+                )
+
+
+
+
+@task(name="Load gold weekly summarized data to Azure blob", retries=3, retry_delay_seconds=30)
+def load_gold_monthly_summ_data_to_azure(pipeline_name, month: pd.DataFrame):
+    logger = get_logger()
+    logger.info("Start task loading gold weekly data to Azure",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,
+                       }
+                )
+    load_monthly_summ_data_to_azure_worker(pipeline_name, month)
+
+    logger.info("Completed task loading gold weekly data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,
                        "task_run_id": runtime.task_run.id,
                        }

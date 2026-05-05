@@ -491,3 +491,24 @@ def load_gold_weekly_summ_data_to_postgres_worker(
         except SQLAlchemyError:
             logger.exception("Failed to load weekly summ data for week number %s", week_number)
             raise
+        
+        
+
+def load_monthly_summ_data_to_azure_worker(pipeline_name, month):
+    """
+    Converts a Pandas DataFrame to Parquet bytes and uploads to Azure using the base uploader.
+    """
+    logger = get_logger()
+
+    month_number = int(month["month_number"].iloc[0])
+    year_str = str(month["year"].iloc[0])
+    file_name = f"W{month_number:02d}.parquet"
+    # Convert to Parquet bytes
+    parquet_buffer = io.BytesIO()
+    month.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
+    parquet_bytes = parquet_buffer.getvalue()
+    upload_parquet_bytes(fs_client, config("BASE_DIR_MONTHLY_SUMM_GOLD"), [year_str,
+                                                                                   file_name],
+                                                                                   parquet_bytes)
+    # update_last_processed_timestamp(pipeline_name,
+    #                                 ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
