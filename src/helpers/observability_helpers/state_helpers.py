@@ -238,11 +238,15 @@ def reconcile_processing_state(
             status = "pending"
             actual_count = 0
 
+        expected_count = cfg.get("expected_count") or (
+            d.days_in_month if cfg["grain"] == "month" else None
+        )
+
         upsert_state_fn(
             processing_level=pipeline_name,
             partition_date=d,
             status=status,
-            expected_count=cfg["expected_count"],
+            expected_count=expected_count,
             actual_count=actual_count,
         )
 

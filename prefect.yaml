@@ -69,7 +69,7 @@ deployments:
 
   - name: gold-monthly-summ-flow
     description: Local Prefect deployment for gold monthly summarized weather data flow
-    entrypoint: src/flows/gold/monthly_summ_agg_data.py:weekly_to_monthly_aggregation
+    entrypoint: src/flows/gold/monthly_summ_agg_data.py:daily_to_monthly_aggregation
     schedule:
       cron: "9 0 1 * *"
       timezone: UTC

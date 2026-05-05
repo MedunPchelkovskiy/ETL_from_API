@@ -2,6 +2,8 @@ import pendulum
 import psycopg2
 from decouple import config
 
+from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG
+
 
 def get_pending_work(
         processing_level: str,
@@ -53,7 +55,7 @@ def get_pending_work(
               {error_clause}
             ORDER BY partition_date
         """
-        params = (processing_level, *statuses, max_retries[processing_level], *error_params)
+        params = (processing_level, *statuses, PIPELINE_CONFIG[processing_level]["max_retries"], *error_params)
 
         with conn.cursor() as cur:
             cur.execute(query, params)

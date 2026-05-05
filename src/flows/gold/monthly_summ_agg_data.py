@@ -13,12 +13,12 @@ from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, P
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_daily_gold_azure, get_daily_gold_postgres
-from src.tasks.gold.load_gold_data import load_gold_monthly_summ_data_to_azure
+from src.tasks.gold.load_gold_data import load_gold_monthly_summ_data_to_azure, load_gold_monthly_summ_data_to_postgres
 from src.tasks.gold.transform_gold_data import get_monthly_summ_data
 
 PIPELINE_NAME = "gold_monthly"
 
-@flow(name="Aggregate weekly to monthly flow")
+@flow(name="Aggregate daily to monthly flow")
 def daily_to_monthly_aggregation():
     logger = get_logger()
     now = pendulum.now("UTC")
@@ -78,13 +78,14 @@ def daily_to_monthly_aggregation():
     for month_start in pending_months:
         month_label = month_start.to_date_string()
         month_days = generate_dates(month_start, month_start.add(months=1), grain="day")
+        expected_days = month_start.days_in_month
 
         # mark as processing — prevents duplicate runs
         upsert_state_fn(
             processing_level=PIPELINE_NAME,
             partition_date=month_start,
             status="processing",
-            expected_count=cfg["expected_count"],
+            expected_count=expected_days,
         )
         # ── extract: Azure first, Postgres fallback ───────────────────────────
         try:
@@ -103,7 +104,7 @@ def daily_to_monthly_aggregation():
                     processing_level=PIPELINE_NAME,
                     partition_date=month_start,
                     status="failed",
-                    expected_count=cfg["expected_count"],
+                    expected_count=expected_days,
                     actual_count=0,
                     error_type="missing_partitions",
                     error_message=str(e2),
@@ -161,7 +162,7 @@ def daily_to_monthly_aggregation():
                 processing_level=PIPELINE_NAME,
                 partition_date=month_start,
                 status="failed",
-                expected_count=cfg["expected_count"],
+                expected_count=expected_days,
                 actual_count=len(all_days_dfs),
                 error_type="insufficient_data",
                 error_message=str(e),
@@ -173,7 +174,7 @@ def daily_to_monthly_aggregation():
                 processing_level=PIPELINE_NAME,
                 partition_date=month_start,
                 status="failed",
-                expected_count=cfg["expected_count"],
+                expected_count=expected_days,
                 actual_count=len(all_days_dfs),
                 error_type="transformation_error",
                 error_message=str(e),
@@ -186,6 +187,7 @@ def daily_to_monthly_aggregation():
     # ── load ──────────────────────────────────────────────────────────────────
     for month_start, monthly_summ in all_months_summ:
         month_label = month_start.to_date_string()
+        expected_days = month_start.days_in_month
         azure_ok = False
         postgres_ok = False
 
@@ -206,15 +208,15 @@ def daily_to_monthly_aggregation():
                 processing_level=PIPELINE_NAME,
                 partition_date=month_start,
                 status="success",
-                expected_count=cfg["expected_count"],
-                actual_count=cfg["expected_count"],
+                expected_count=expected_days,
+                actual_count=expected_days,
             )
         else:
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
                 partition_date=month_start,
                 status="failed",
-                expected_count=cfg["expected_count"],
+                expected_count=expected_days,
                 actual_count=0,
                 error_type="missing_partitions",
                 error_message="Both Azure and Postgres load failed",
@@ -241,4 +243,4 @@ def daily_to_monthly_aggregation():
         )
 
 if __name__ == "__main__":
-    weekly_to_monthly_aggregation()
+    daily_to_monthly_aggregation()
