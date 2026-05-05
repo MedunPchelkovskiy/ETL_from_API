@@ -408,10 +408,8 @@ def load_weekly_summ_data_to_azure_worker(pipeline_name, week):
     week.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
     parquet_bytes = parquet_buffer.getvalue()
     upload_parquet_bytes(fs_client, config("BASE_DIR_WEEKLY_SUMM_GOLD"), [year_str,
-                                                                                   file_name],
-                                                                                   parquet_bytes)
-    # update_last_processed_timestamp(pipeline_name,
-    #                                 ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
+                                                                          file_name],
+                         parquet_bytes)
 
 
 def load_gold_weekly_summ_data_to_postgres_worker(
@@ -467,7 +465,7 @@ def load_gold_weekly_summ_data_to_postgres_worker(
 
         try:
             for start in range(0, len(df), batch_size):
-                batch = df.iloc[start : start + batch_size]
+                batch = df.iloc[start: start + batch_size]
                 values = batch.to_dict(orient="records")
 
                 with engine.begin() as conn:
@@ -491,8 +489,7 @@ def load_gold_weekly_summ_data_to_postgres_worker(
         except SQLAlchemyError:
             logger.exception("Failed to load weekly summ data for week number %s", week_number)
             raise
-        
-        
+
 
 def load_monthly_summ_data_to_azure_worker(pipeline_name, month):
     """
@@ -508,7 +505,84 @@ def load_monthly_summ_data_to_azure_worker(pipeline_name, month):
     month.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
     parquet_bytes = parquet_buffer.getvalue()
     upload_parquet_bytes(fs_client, config("BASE_DIR_MONTHLY_SUMM_GOLD"), [year_str,
-                                                                                   file_name],
-                                                                                   parquet_bytes)
-    # update_last_processed_timestamp(pipeline_name,
-    #                                 ts)  # TODO: Make update only if new blob is uploaded! Now it update for run!!!!
+                                                                           file_name],
+                         parquet_bytes)
+
+
+def load_gold_monthly_summ_data_to_postgres_worker(
+        engine,
+        all_months_summ: list[pd.DataFrame],
+):
+    """
+    Loader for gold_monthly_summarized_data.
+    Expects pre-validated DataFrames from the Gold layer.
+    Demonstrates batch INSERT with ON CONFLICT for portfolio scalability showcase.
+    """
+    logger = get_logger()
+
+    stmt = text("""
+        INSERT INTO gold_monthly_summarized_data (
+            place_name, generated_at,
+            month_number, year, month_start,
+            temp_max, temp_min, temp_avg,
+            rain_min, rain_max, rain_avg,
+            snow_min, snow_max, snow_avg,
+            wind_speed_min, wind_speed_max, wind_speed_avg,
+            cloud_cover_min, cloud_cover_max, cloud_cover_avg,
+            humidity_min, humidity_max, humidity_avg
+        ) VALUES (
+            :place_name, :generated_at,
+            :month_number, :year, :month_start,
+            :temp_max, :temp_min, :temp_avg,
+            :rain_min, :rain_max, :rain_avg,
+            :snow_min, :snow_max, :snow_avg,
+            :wind_speed_min, :wind_speed_max, :wind_speed_avg,
+            :cloud_cover_min, :cloud_cover_max, :cloud_cover_avg,
+            :humidity_min, :humidity_max, :humidity_avg
+        )
+        ON CONFLICT (place_name, year, month_number) DO NOTHING
+    """)
+
+    batch_size = int(1000)
+
+    for df in all_months_summ:
+        if df is None or df.empty:
+            logger.warning("Gold monthly summ worker skip load: empty dataframe")
+            continue
+        month_number = df['month_number'].iloc[0]
+        year = df['year'].iloc[0]
+
+        logger.info(
+            "Loading month number %s-%s | shape=%s",
+            year, month_number, df.shape
+        )
+
+        total_inserted = 0
+        total_skipped = 0
+
+        try:
+            for start in range(0, len(df), batch_size):
+                batch = df.iloc[start: start + batch_size]
+                values = batch.to_dict(orient="records")
+
+                with engine.begin() as conn:
+                    result = conn.execute(stmt, values)
+                    inserted = result.rowcount or 0
+
+                skipped = len(values) - inserted
+                total_inserted += inserted
+                total_skipped += skipped
+
+                logger.info(
+                    "Batch %s | inserted=%s | skipped=%s | size=%s",
+                    start // batch_size + 1, inserted, skipped, len(values),
+                )
+
+            logger.info(
+                "Done month number %s | total_inserted=%s | total_skipped=%s | total_rows=%s",
+                month_number, total_inserted, total_skipped, len(df),
+            )
+
+        except SQLAlchemyError:
+            logger.exception("Failed to load monthly summ data for month number %s", month_number)
+            raise
