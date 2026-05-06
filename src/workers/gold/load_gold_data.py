@@ -499,7 +499,7 @@ def load_monthly_summ_data_to_azure_worker(pipeline_name, month):
 
     month_number = int(month["month_number"].iloc[0])
     year_str = str(month["year"].iloc[0])
-    file_name = f"W{month_number:02d}.parquet"
+    file_name = f"{month_number:02d}.parquet"
     # Convert to Parquet bytes
     parquet_buffer = io.BytesIO()
     month.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")

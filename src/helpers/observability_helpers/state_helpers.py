@@ -228,19 +228,20 @@ def reconcile_processing_state(
         )
 
     for d in expected_dates:
+        expected_count = cfg.get("expected_count") or (
+            d.days_in_month if cfg["grain"] == "month" else None
+        )
         a = azure_map.get(d, "missing")
         p = postgres_map.get(d, "missing")
 
         if a == "success" or p == "success":
             status = "success"
-            actual_count = cfg["expected_count"]
+            actual_count = expected_count
         else:
             status = "pending"
             actual_count = 0
 
-        expected_count = cfg.get("expected_count") or (
-            d.days_in_month if cfg["grain"] == "month" else None
-        )
+
 
         upsert_state_fn(
             processing_level=pipeline_name,

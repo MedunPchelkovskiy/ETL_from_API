@@ -35,7 +35,8 @@ def get_weekly_summ_data(week_start: pendulum.DateTime,
         raise
 
 
-@task(name="Transform gold daily data to monthly")
+@task(name="Transform gold daily data to monthly",
+      task_run_name="Transform monthly | {month_start}")
 def get_monthly_summ_data(month_start: pendulum.DateTime,
                          days: list[tuple[pendulum.DateTime, pd.DataFrame]],
                           max_missing_ratio: float,) -> pd.DataFrame:

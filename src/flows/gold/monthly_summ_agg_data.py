@@ -192,13 +192,13 @@ def daily_to_monthly_aggregation():
         postgres_ok = False
 
         try:
-            load_gold_monthly_summ_data_to_azure(PIPELINE_NAME, monthly_summ)
+            load_gold_monthly_summ_data_to_azure(PIPELINE_NAME, month_start, monthly_summ)
             azure_ok = True
         except Exception:
             logger.exception(f"[{PIPELINE_NAME}] Azure upload failed for {month_label}")
 
         try:
-            load_gold_monthly_summ_data_to_postgres(PIPELINE_NAME, [monthly_summ])
+            load_gold_monthly_summ_data_to_postgres(PIPELINE_NAME, month_start,[monthly_summ])
             postgres_ok = True
         except Exception:
             logger.exception(f"[{PIPELINE_NAME}] Postgres load failed for {month_label}")

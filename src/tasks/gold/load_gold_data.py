@@ -154,8 +154,9 @@ def load_gold_weekly_summ_data_to_postgres(pipeline_name, all_weeks_summ: list[p
 
 
 
-@task(name="Load gold monthly summarized data to Azure blob", retries=3, retry_delay_seconds=30)
-def load_gold_monthly_summ_data_to_azure(pipeline_name, month: pd.DataFrame):
+@task(name="Load gold monthly summarized data to Azure blob", retries=3, retry_delay_seconds=30,
+      task_run_name="Load monthly Azure | {pipeline_name} | {month_start}")
+def load_gold_monthly_summ_data_to_azure(pipeline_name, month_start, month: pd.DataFrame):
     logger = get_logger()
     logger.info("Start task loading gold monthly data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,
@@ -173,8 +174,9 @@ def load_gold_monthly_summ_data_to_azure(pipeline_name, month: pd.DataFrame):
 
 
 
-@task(name="Load gold monthly summarized data to postgres", retries=3, retry_delay_seconds=60)
-def load_gold_monthly_summ_data_to_postgres(pipeline_name, all_months_summ: list[pd.DataFrame]):
+@task(name="Load gold monthly summarized data to postgres", retries=3, retry_delay_seconds=60,
+      task_run_name="Load monthly Postgres | {pipeline_name} | {month_start}")
+def load_gold_monthly_summ_data_to_postgres(pipeline_name, month_start, all_months_summ: list[pd.DataFrame]):
     logger = get_logger()
     logger.info("Start task loading gold monthly data to Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,
