@@ -1,3 +1,9 @@
+import pendulum
+
+completed_months = pendulum.now("UTC").month - 1
+
+max_missing_count = min(completed_months // 3, 4)
+
 PIPELINE_CONFIG = {
     "bronze_openweather": {
         "grain": "day",
@@ -47,6 +53,30 @@ PIPELINE_CONFIG = {
         "postgres_date_col": "month_start",
         "max_retries": 3,
     },
+    "gold_yearly": {
+        "grain": "month",
+        "max_missing_ratio":
+            max_missing_count / completed_months
+            if completed_months > 0
+            else 0,
+        # "expected_count": 12,
+        "expected_count": completed_months,
+        "source_check": "azure+postgres",
+        "azure_path_env": "BASE_DIR_YEARLY_SUMM_GOLD",  # year.parquet
+        "postgres_table": "gold_yearly_summarized_data",
+        "postgres_date_col": "year_start",
+        "max_retries": 3,
+        },
+    "gold_yearly_Q": {
+        "grain": "month",
+        "max_missing_ratio": 0.33,
+        "expected_count": 3,
+        "source_check": "azure+postgres",
+        "azure_path_env": "BASE_DIR_YEARLY_SUMM_GOLD",  # Q(1, 2, 3, 4).parquet
+        "postgres_table": "gold_yearly_summarized_data",
+        "postgres_date_col": "year_start",
+        "max_retries": 3,
+    },
 }
 
 PIPELINE_STATUS_MAP = {
@@ -56,6 +86,8 @@ PIPELINE_STATUS_MAP = {
     "gold_daily": ["pending", "failed", "partial"],
     "gold_weekly": ["pending", "failed", "partial"],
     "gold_monthly": ["pending", "failed", "partial"],
+    "gold_yearly": ["pending", "failed", "partial"],
+    "gold_yearly_Q": ["pending", "failed", "partial"],
 }
 
 PIPELINE_ERROR_MAP = {
@@ -65,4 +97,6 @@ PIPELINE_ERROR_MAP = {
     "gold_daily": ["insufficient_data", "missing_partitions", None],
     "gold_weekly": ["insufficient_data", "missing_partitions", None],
     "gold_monthly": ["insufficient_data", "missing_partitions", None],
+    "gold_yearly": ["insufficient_data", "missing_partitions", None],
+    "gold_yearly_Q": ["insufficient_data", "missing_partitions", None],
 }
