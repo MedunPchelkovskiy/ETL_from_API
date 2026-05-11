@@ -143,3 +143,24 @@ def get_daily_data_postgres(week_dates: list[pendulum.DateTime], engine):
 
 
     return all_days_dfs, missing_days
+
+
+def get_monthly_blob_for_year(month, fs_client) -> pd.DataFrame:
+    logger = get_logger()
+    df = pd.DataFrame()
+    year = month.format("YYYY")
+    path_month = month.format("MM")
+    file_path = f"{config('BASE_DIR_MONTHLY_SUMM_GOLD')}/{year}/{path_month}.parquet"
+
+    try:
+        file_client = fs_client.get_file_client(file_path)
+        downloaded_bytes = file_client.download_file().readall()
+        df = pd.read_parquet(BytesIO(downloaded_bytes))
+
+        if df.empty:
+            logger.warning(f"Empty parquet for {year}-{month}, treating as missing")
+
+    except ResourceNotFoundError:
+        logger.warning(f"Blob not found: {file_path}")
+
+    return df

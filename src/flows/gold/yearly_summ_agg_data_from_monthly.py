@@ -8,8 +8,11 @@ from sqlalchemy import create_engine
 from src.clients.datalake_client import fs_client
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.find_process_state import get_pending_work
+from src.helpers.observability_helpers.initial_run_states import generate_dates
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
-from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state
+from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
+    upsert_state_fn
+from src.tasks.gold.extract_from_gold import get_monthly_gold_azure
 
 PIPELINE_NAME = "gold_yearly"
 
@@ -68,4 +71,45 @@ def monthly_to_yearly_aggregation():
         return Completed(message="Skipped-AlreadyProcessed")
 
     logger.info(f"[{PIPELINE_NAME}] {len(pending_months)} month(s) to process")
+
+    # ── process each pending month ─────────────────────────────────────────────
+    all_months_summ = []
+    skipped_months = []
+    failed_months = []
+
+    for month in pending_months:
+        month_label = month.to_date_string()
+        expected_days = month.days_in_month
+
+        # mark as processing — prevents duplicate runs
+        upsert_state_fn(
+            processing_level=PIPELINE_NAME,
+            partition_date=month,
+            status="processing",
+            expected_count=expected_days,
+        )
+        # ── extract: Azure first, Postgres fallback ───────────────────────────
+        try:
+            month_df= get_monthly_gold_azure(month)
+        except Exception as e:
+            logger.warning(
+                f"[{PIPELINE_NAME}] Azure failed for {month_label}, falling back to Postgres | {e}"
+            )
+            try:
+                all_days_dfs, missing_days = get_daily_gold_postgres(month_days)
+            except Exception as e2:
+                logger.error(
+                    f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}"
+                )
+                upsert_state_fn(
+                    processing_level=PIPELINE_NAME,
+                    partition_date=month,
+                    status="failed",
+                    expected_count=expected_days,
+                    actual_count=0,
+                    error_type="missing_partitions",
+                    error_message=str(e2),
+                )
+                failed_months.append(month_label)
+                continue
 

@@ -10,7 +10,7 @@ from src.clients.datalake_client import fs_client
 from src.helpers.gold.extract import get_last_processed_timestamp
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.gold.extract_gold_data import get_hourly_blobs_for_day, get_hourly_data_postgres, \
-    get_daily_blobs_for_week, get_daily_data_postgres
+    get_daily_blobs_for_week, get_daily_data_postgres, get_monthly_blob_for_year
 
 
 @task(name="Get hourly day data from azure")
@@ -219,4 +219,25 @@ def get_daily_gold_postgres(week_dates: list[pendulum.DateTime],
 #     logger = get_logger()
 #     logger.info(f"Fetching {len(week_dates)} days from Postgres")
 #     return get_daily_data_postgres(week_dates, engine)
+
+@task(name="get monthly summ gold blobs", retries=3, retry_delay_seconds=60)
+def get_monthly_gold_azure(month: pendulum.DateTime,
+                         ) -> pd.DataFrame:
+    logger = get_logger()
+    start_time = pendulum.now("UTC")
+
+    logger.info(f"Fetching month: {month}")      #TODO: eventually f"{week_dates[0].to_date_string()} → {week_dates[-1].to_date_string()}" if log is not only date
+
+    month_df = get_monthly_blob_for_year(month, fs_client)
+
+    logger.info(f"Monthly blob — fetched: {month}")
+
+    duration = (pendulum.now("UTC") - start_time).total_seconds()
+    logger.info(
+        f"Finished fetching. "
+        f"Month fetched: {month}. "
+        f"Duration: {duration:.2f}s"
+    )
+
+    return month_df
 
