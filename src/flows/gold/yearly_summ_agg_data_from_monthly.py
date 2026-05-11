@@ -2,11 +2,13 @@ import pendulum
 import prefect
 from decouple import config
 from prefect import flow
+from prefect.states import Completed
 from sqlalchemy import create_engine
 
 from src.clients.datalake_client import fs_client
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
-from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG
+from src.helpers.observability_helpers.find_process_state import get_pending_work
+from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state
 
 PIPELINE_NAME = "gold_yearly"
@@ -52,3 +54,18 @@ def monthly_to_yearly_aggregation():
         fs_client=fs_client,
         engine=engine,
     )
+
+    # ── fetch pending work ────────────────────────────────────────────────────
+    pending_months: list[pendulum.DateTime] = get_pending_work(
+        processing_level=PIPELINE_NAME,
+        statuses=PIPELINE_STATUS_MAP[PIPELINE_NAME],
+        error_types=PIPELINE_ERROR_MAP[PIPELINE_NAME],
+        max_retries=cfg["max_retries"],
+    )
+
+    if not pending_months:
+        logger.info(f"[{PIPELINE_NAME}] No pending months — nothing to do")
+        return Completed(message="Skipped-AlreadyProcessed")
+
+    logger.info(f"[{PIPELINE_NAME}] {len(pending_months)} month(s) to process")
+

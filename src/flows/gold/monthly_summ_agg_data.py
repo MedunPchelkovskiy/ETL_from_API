@@ -62,6 +62,7 @@ def daily_to_monthly_aggregation():
         processing_level=PIPELINE_NAME,
         statuses=PIPELINE_STATUS_MAP[PIPELINE_NAME],
         error_types=PIPELINE_ERROR_MAP[PIPELINE_NAME],
+        max_retries=cfg["max_retries"],
     )
 
     if not pending_months:

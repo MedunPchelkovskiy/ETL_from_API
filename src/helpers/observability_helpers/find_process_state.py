@@ -9,6 +9,7 @@ def get_pending_work(
         processing_level: str,
         statuses: list[str],
         error_types: list,  # может да съдържа None → OR error_type IS NULL
+        max_retries: int,
 ) -> list[pendulum.DateTime]:
     """
     Returns list of partition_dates (as pendulum.DateTime UTC)
@@ -17,11 +18,11 @@ def get_pending_work(
     None in error_types → includes rows where error_type IS NULL.
     """
     conn = psycopg2.connect(config("DB_CONN_RAW"))
-    max_retries = {
-        "gold_weekly": 3,  # 3 пускания = 3 седмици = приемаме загубата
-        "gold_daily": 5,
-        "bronze": 10,  # API issues се оправят по-бързо
-    }
+    # max_retries = {
+    #     "gold_weekly": 3,  # 3 пускания = 3 седмици = приемаме загубата
+    #     "gold_daily": 5,
+    #     "bronze": 10,  # API issues се оправят по-бързо
+    # }
 
     try:
         # Split None from real values
@@ -51,11 +52,11 @@ def get_pending_work(
             FROM processing_state
             WHERE processing_level = %s
               AND status IN ({status_placeholders})
-              AND retry_count < %s   -- ← ново
+              AND retry_count < %s  
               {error_clause}
             ORDER BY partition_date
         """
-        params = (processing_level, *statuses, PIPELINE_CONFIG[processing_level]["max_retries"], *error_params)
+        params = (processing_level, *statuses, max_retries, *error_params)
 
         with conn.cursor() as cur:
             cur.execute(query, params)
