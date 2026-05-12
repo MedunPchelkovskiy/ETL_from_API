@@ -11,21 +11,23 @@ from src.helpers.observability_helpers.find_process_state import get_pending_wor
 from src.helpers.observability_helpers.initial_run_states import generate_dates
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
-    upsert_state_fn
+    upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure
 
 PIPELINE_NAME = "gold_yearly"
 
-
-@flow(
-    name="Aggregate monthly to yearly flow",
-)
+@flow(name="Aggregate monthly to yearly flow")
 def monthly_to_yearly_aggregation():
     logger = get_logger()
     now = pendulum.now("UTC")
     engine = create_engine(config("DB_CONN_RAW"))
     cfg = PIPELINE_CONFIG[PIPELINE_NAME]
     max_missing_ratio = cfg["max_missing_ratio"]
+
+    # ── early gate ────────────────────────────────────────────────────────────
+    if now.month < 3:
+        logger.info(f"[{PIPELINE_NAME}] Too early — minimum 2 months required")
+        return Completed(message="Skipped-TooEarly")
 
     logger.info(
         f"Starting {PIPELINE_NAME}",
@@ -35,8 +37,9 @@ def monthly_to_yearly_aggregation():
         },
     )
 
-    now = pendulum.now("UTC")
     end_date = now.start_of("month")  # текущият месец excluded
+    expected_months = now.month - 1
+    max_missing = round(expected_months * max_missing_ratio)
 
     last_reconciled = get_last_reconciled_date(PIPELINE_NAME)
 
@@ -72,44 +75,70 @@ def monthly_to_yearly_aggregation():
 
     logger.info(f"[{PIPELINE_NAME}] {len(pending_months)} month(s) to process")
 
-    # ── process each pending month ─────────────────────────────────────────────
-    all_months_summ = []
-    skipped_months = []
-    failed_months = []
+    # ── extract ───────────────────────────────────────────────────────────────
+    all_months_dfs = []
+    missing_months = []
 
     for month in pending_months:
         month_label = month.to_date_string()
-        expected_days = month.days_in_month
 
-        # mark as processing — prevents duplicate runs
         upsert_state_fn(
             processing_level=PIPELINE_NAME,
             partition_date=month,
             status="processing",
-            expected_count=expected_days,
+            expected_count=expected_months,
         )
-        # ── extract: Azure first, Postgres fallback ───────────────────────────
+
         try:
-            month_df= get_monthly_gold_azure(month)
+            month_df = get_monthly_gold_azure(month)
+            all_months_dfs.append((month, month_df))
         except Exception as e:
             logger.warning(
                 f"[{PIPELINE_NAME}] Azure failed for {month_label}, falling back to Postgres | {e}"
             )
             try:
-                all_days_dfs, missing_days = get_daily_gold_postgres(month_days)
+                month_df = get_monthly_gold_postgres(month)
+                all_months_dfs.append((month, month_df))
             except Exception as e2:
                 logger.error(
                     f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}"
                 )
-                upsert_state_fn(
-                    processing_level=PIPELINE_NAME,
-                    partition_date=month,
-                    status="failed",
-                    expected_count=expected_days,
-                    actual_count=0,
-                    error_type="missing_partitions",
-                    error_message=str(e2),
-                )
-                failed_months.append(month_label)
+                missing_months.append(month)
                 continue
 
+    # ── missing months gate ───────────────────────────────────────────────────
+    if len(missing_months) > max_missing:
+        current_retries = get_current_retry_count(PIPELINE_NAME, pendulum.datetime(now.year, 1, 1))
+
+        if current_retries >= cfg["max_retries"]:
+            status = "abandoned"
+            error_message = (
+                f"Abandoned after {current_retries} retries — "
+                f"no source data available. Missing months: {[m.to_date_string() for m in missing_months]}"
+            )
+            logger.error(f"[{PIPELINE_NAME}] Year {now.year} abandoned after {current_retries} retries")
+        else:
+            status = "pending"
+            error_message = f"Missing months: {[m.to_date_string() for m in missing_months]}"
+            logger.warning(
+                f"[{PIPELINE_NAME}] Year {now.year} — "
+                f"{len(missing_months)}/{expected_months} missing month(s) "
+                f"| retry {current_retries + 1}/{cfg['max_retries']}"
+            )
+
+        upsert_state_fn(
+            processing_level=PIPELINE_NAME,
+            partition_date=pendulum.datetime(now.year, 1, 1),
+            status=status,
+            expected_count=expected_months,
+            actual_count=expected_months - len(missing_months),
+            error_type="missing_partitions",
+            error_message=error_message,
+        )
+        return Completed(message="Skipped-InsufficientData")
+
+    if missing_months:
+        logger.warning(
+            f"[{PIPELINE_NAME}] Year {now.year} — proceeding with "
+            f"{len(missing_months)} missing month(s): {[m.to_date_string() for m in missing_months]}"
+        )
