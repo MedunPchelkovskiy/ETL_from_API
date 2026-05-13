@@ -117,3 +117,45 @@ def get_monthly_summ_data_worker(month_start,
     monthly_summ_df["generated_at"] = pendulum.now("UTC")
 
     return monthly_summ_df
+
+def aggregate_months_to_year(dfs: list[tuple[pendulum.DateTime, pd.DataFrame]], expected_months, max_missing_ratio, year) -> pd.DataFrame:
+    not_empty_dfs = [df for ts, df in dfs if not df.empty]
+    min_required = expected_months - round(expected_months * max_missing_ratio)
+
+
+    if len(not_empty_dfs) < min_required:
+        raise ValueError(
+            f"Insufficient data for {year}: "
+            f"{len(not_empty_dfs)}/{expected_months} months available, "
+            f"minimum required: {min_required}"
+        )
+
+    combined_df = pd.concat(not_empty_dfs, ignore_index=True)
+
+    yearly_summ_df = combined_df.groupby(["place_name"]).agg(
+        temp_max=('temp_max', 'max'),
+        temp_min=('temp_min', 'min'),
+        temp_avg=('temp_avg', 'mean'),
+        wind_speed_max=('wind_speed_max', 'max'),
+        wind_speed_min=('wind_speed_min', 'min'),
+        wind_speed_avg=('wind_speed_avg', 'mean'),
+        rain_max=("rain_max", "max"),
+        rain_min=("rain_min", "min"),
+        rain_avg=("rain_avg", "mean"),
+        snow_max=("snow_max", "max"),
+        snow_min=("snow_min", "min"),
+        snow_avg=("snow_avg", "mean"),
+        cloud_cover_max=("cloud_cover_max", "max"),
+        cloud_cover_min=("cloud_cover_min", "min"),
+        cloud_cover_avg=("cloud_cover_avg", "mean"),
+        humidity_max=("humidity_max", "max"),
+        humidity_min=("humidity_min", "min"),
+        humidity_avg=("humidity_avg", "mean"),
+    ).reset_index().round(2)
+    yearly_summ_df["year"] = year
+    yearly_summ_df["year_start"] = pendulum.datetime(year, 1, 1).date()
+    yearly_summ_df["period_type"] = "yearly"
+    yearly_summ_df["generated_at"] = pendulum.now("UTC")
+
+    return yearly_summ_df
+

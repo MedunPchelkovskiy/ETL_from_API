@@ -1,3 +1,4 @@
+import pandas as pd
 import pendulum
 import prefect
 from decouple import config
@@ -13,6 +14,7 @@ from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, P
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure
+from src.tasks.gold.transform_gold_data import aggregate_gold_months
 
 PIPELINE_NAME = "gold_yearly"
 
@@ -92,6 +94,12 @@ def monthly_to_yearly_aggregation():
         try:
             month_df = get_monthly_gold_azure(month)
             all_months_dfs.append((month, month_df))
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=month,
+                status="success",
+                expected_count=expected_months,
+            )
         except Exception as e:
             logger.warning(
                 f"[{PIPELINE_NAME}] Azure failed for {month_label}, falling back to Postgres | {e}"
@@ -99,18 +107,30 @@ def monthly_to_yearly_aggregation():
             try:
                 month_df = get_monthly_gold_postgres(month)
                 all_months_dfs.append((month, month_df))
+                upsert_state_fn(
+                    processing_level=PIPELINE_NAME,
+                    partition_date=month,
+                    status="success",
+                    expected_count=expected_months,
+                )
             except Exception as e2:
                 logger.error(
                     f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}"
                 )
                 missing_months.append(month)
+                upsert_state_fn(
+                    processing_level=PIPELINE_NAME,
+                    partition_date=month,
+                    status="pending",
+                    expected_count=expected_months,
+                )
                 continue
 
     # ── missing months gate ───────────────────────────────────────────────────
     if len(missing_months) > max_missing:
         current_retries = get_current_retry_count(PIPELINE_NAME, pendulum.datetime(now.year, 1, 1))
 
-        if current_retries >= cfg["max_retries"]:
+        if current_retries >= cfg["max_retries"] and expected_months == 12:
             status = "abandoned"
             error_message = (
                 f"Abandoned after {current_retries} retries — "
@@ -142,3 +162,34 @@ def monthly_to_yearly_aggregation():
             f"[{PIPELINE_NAME}] Year {now.year} — proceeding with "
             f"{len(missing_months)} missing month(s): {[m.to_date_string() for m in missing_months]}"
         )
+
+    # ── transform ─────────────────────────────────────────────────────────
+
+    try:
+        year = now.year
+        yearly_summ = aggregate_gold_months(all_months_dfs, expected_months, max_missing_ratio, year)
+    except ValueError as e:
+        upsert_state_fn(
+            processing_level=PIPELINE_NAME,
+            partition_date=pendulum.datetime(year, 1, 1),
+            status="failed",
+            expected_count=expected_months,
+            actual_count=len(all_months_dfs),
+            error_type="insufficient_data",
+            error_message=str(e),
+        )
+        return
+    except Exception as e:
+        upsert_state_fn(
+            processing_level=PIPELINE_NAME,
+            partition_date=pendulum.datetime(year, 1, 1),
+            status="failed",
+            expected_count=expected_months,
+            actual_count=len(all_months_dfs),
+            error_type="transformation_error",
+            error_message=str(e),
+        )
+        return
+
+
+

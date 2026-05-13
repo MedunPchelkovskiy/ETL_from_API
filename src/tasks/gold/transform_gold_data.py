@@ -1,10 +1,13 @@
+from venv import logger
+
 import pandas as pd
 import pendulum
 from prefect import task
+from sqlalchemy_utils.types import password
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.gold.transform_gold_data import get_daily_summ_data_worker, get_weekly_summ_data_worker, \
-    get_monthly_summ_data_worker
+    get_monthly_summ_data_worker, aggregate_months_to_year
 
 
 @task(name="Transform gold data to daily")
@@ -51,3 +54,15 @@ def get_monthly_summ_data(month_start: pendulum.DateTime,
     except Exception:
         logger.exception(f"Failed processing month {month_start}")
         raise
+
+
+@task(name="Transform gold monthly data to yearly",
+      task_run_name="Transform monthly | {year}")
+def aggregate_gold_months(all_months_dfs, expected_months, max_missing_ratio, year) -> pd.DataFrame:
+    logger = get_logger()
+    logger.info(f"Start task aggregate monthly gold data")
+    aggregated_months_dfs = aggregate_months_to_year(all_months_dfs, expected_months, max_missing_ratio, year)
+    logger.info(f"End task aggregate monthly gold data")
+
+    return aggregated_months_dfs
+
