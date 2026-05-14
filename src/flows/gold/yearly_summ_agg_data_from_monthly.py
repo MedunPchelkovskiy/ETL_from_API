@@ -12,9 +12,9 @@ from src.helpers.observability_helpers.find_process_state import get_pending_wor
 from src.helpers.observability_helpers.initial_run_states import generate_dates
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
-    upsert_state_fn, get_current_retry_count
+    upsert_state_fn, get_current_retry_count, enough_months_quarter
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure
-from src.tasks.gold.transform_gold_data import aggregate_gold_months
+from src.tasks.gold.transform_gold_data import aggregate_gold_months, agregate_months_quarter
 
 PIPELINE_NAME = "gold_yearly"
 
@@ -168,6 +168,12 @@ def monthly_to_yearly_aggregation():
     try:
         year = now.year
         yearly_summ = aggregate_gold_months(all_months_dfs, expected_months, max_missing_ratio, year)
+        # upsert_state_fn(
+        #     processing_level=PIPELINE_NAME,
+        #     partition_date=pendulum.datetime(year, 1, 1),
+        #     status="success",
+        #     expected_count=expected_months,
+        # )
     except ValueError as e:
         upsert_state_fn(
             processing_level=PIPELINE_NAME,
@@ -190,6 +196,39 @@ def monthly_to_yearly_aggregation():
             error_message=str(e),
         )
         return
+
+    quarter = (pendulum.now().month - 1) // 3 + 1
+    enough_months = enough_months_quarter(year, quarter)
+    if len(enough_months) >= 2:
+        try:
+            quarterly_sum = agregate_months_quarter(all_months_dfs, year, quarter,enough_months)
+            # upsert_state_fn(
+            #     processing_level=PIPELINE_NAME,
+            #     partition_date=pendulum.datetime(year, 1, 1),
+            #     status="success",
+            #     expected_count=expected_months,
+            # )
+        except ValueError as e:
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=pendulum.datetime(year, 1, 1),
+                status="failed",
+                expected_count=expected_months,
+                actual_count=len(all_months_dfs),
+                error_type="insufficient_data",
+                error_message=str(e),
+            )
+    else:
+        error_message = f"Missing days {3 - len(missing_months)}"
+        upsert_state_fn(
+            processing_level=PIPELINE_NAME,
+            partition_date=pendulum.datetime(year, 1, 1),
+            status="failed",
+            expected_count=3,
+            actual_count=len(enough_months),
+            error_type="insufficient_data",
+            error_message=error_message,
+        )
 
 
 

@@ -4,6 +4,8 @@ completed_months = pendulum.now("UTC").month - 1
 
 max_missing_count = min(completed_months // 3, 4)
 
+QUARTER_START_MONTH = {1: 1, 2: 4, 3: 7, 4: 10}
+
 PIPELINE_CONFIG = {
     "bronze_openweather": {
         "grain": "day",

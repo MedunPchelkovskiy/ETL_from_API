@@ -2,7 +2,7 @@ import pendulum
 import psycopg2
 from azure.core.exceptions import ResourceNotFoundError
 from decouple import config
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG
@@ -252,3 +252,28 @@ def reconcile_processing_state(
         )
 
     logger.info(f"[reconcile] {pipeline_name}: done")
+
+def enough_months_quarter(year, quarter):
+    engine = create_engine(config("DB_CONN_RAW"))
+    query = """SELECT partition_date
+                FROM processing_state
+                WHERE processing_level = 'gold_monthly'
+                AND status = 'success'
+                AND EXTRACT(QUARTER FROM partition_date) = :quarter
+                AND EXTRACT(YEAR FROM partition_date) = :year
+            """
+
+    with engine.connect() as conn:
+        months_count = conn.execute(
+            text(query),
+            {
+                "processing_level": 'gold_monthly',
+                "status": 'success',
+                "quarter": quarter,
+                "year": year,
+            },
+        ).scalar()
+
+    return months_count
+
+
