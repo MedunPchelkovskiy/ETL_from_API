@@ -164,3 +164,35 @@ def get_monthly_blob_for_year(month, fs_client) -> pd.DataFrame:
         logger.warning(f"Blob not found: {file_path}")
 
     return df
+
+
+def get_monthly_record_for_year(month, engine) -> pd.DataFrame:
+    logger = get_logger()
+    year = month.format("YYYY")
+    path_month = month.format("MM")
+    query = """
+        SELECT *
+          FROM gold_monthly_summarized_data
+         WHERE month_number = %(month)s
+           AND year_number = %(year)s
+    """
+
+    df_month = pd.read_sql(
+        query,
+        engine,
+        params={
+            "month": path_month,
+            "year": year,
+        },
+    )
+    if df_month.empty:
+        logger.warning("No data returned for month")
+
+    # normalize date type
+    if not df_month.empty:
+        df_month["forecast_date_utc"] = pd.to_datetime(
+            df_month["forecast_date_utc"]
+        ).dt.date
+
+    return df_month
+

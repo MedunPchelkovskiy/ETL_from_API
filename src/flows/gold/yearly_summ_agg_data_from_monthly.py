@@ -13,7 +13,7 @@ from src.helpers.observability_helpers.initial_run_states import generate_dates
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
     upsert_state_fn, get_current_retry_count, enough_months_quarter
-from src.tasks.gold.extract_from_gold import get_monthly_gold_azure
+from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
 from src.tasks.gold.transform_gold_data import aggregate_gold_months, agregate_months_quarter
 
 PIPELINE_NAME = "gold_yearly"

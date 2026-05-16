@@ -3,14 +3,14 @@ import pendulum
 import prefect
 from decouple import config
 from prefect import task
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, engine
 from sqlalchemy.exc import SQLAlchemyError, DBAPIError, OperationalError
 
 from src.clients.datalake_client import fs_client
 from src.helpers.gold.extract import get_last_processed_timestamp
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.gold.extract_gold_data import get_hourly_blobs_for_day, get_hourly_data_postgres, \
-    get_daily_blobs_for_week, get_daily_data_postgres, get_monthly_blob_for_year
+    get_daily_blobs_for_week, get_daily_data_postgres, get_monthly_blob_for_year, get_monthly_record_for_year
 
 
 @task(name="Get hourly day data from azure")
@@ -241,3 +241,18 @@ def get_monthly_gold_azure(month: pendulum.DateTime,
 
     return month_df
 
+@task(name="get monthly summ gold postgres", retries=3, retry_delay_seconds=60)
+def get_monthly_gold_postgres(month: pendulum.DateTime,) -> pd.DataFrame:
+    logger = get_logger()
+    start_time = pendulum.now("UTC")
+    logger.info(f"Fetching month: {pendulum.now()}")
+    engine = create_engine(config("DB_CONN_RAW"))
+    month_df = get_monthly_record_for_year(month, engine)
+
+    logger.info(f"Monthly row fetched {month} row ")
+    duration = (pendulum.now("UTC") - start_time).total_seconds()
+    logger.info(f"Finished fetching. "
+                f"Monthly row fetched: {month}"
+                f". Duration: {duration:.2f}s")
+
+    return month_df
