@@ -230,5 +230,62 @@ def monthly_to_yearly_aggregation():
             error_message=error_message,
         )
 
+        # ── load ─────────────────────────────────────────────────────────────────
+
+        try:
+            load_gold_yearly_summ_data_to_azure(PIPELINE_NAME, month_start, monthly_summ)
+            azure_ok = True
+        except Exception:
+            logger.exception(f"[{PIPELINE_NAME}] Azure upload failed for {month_label}")
+
+        try:
+            load_gold_monthly_summ_data_to_postgres(PIPELINE_NAME, month_start, [monthly_summ])
+            postgres_ok = True
+        except Exception:
+            logger.exception(f"[{PIPELINE_NAME}] Postgres load failed for {month_label}")
+
+        if azure_ok or postgres_ok:
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=month_start,
+                status="success",
+                expected_count=expected_days,
+                actual_count=expected_days,
+            )
+        else:
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=month_start,
+                status="failed",
+                expected_count=expected_days,
+                actual_count=0,
+                error_type="missing_partitions",
+                error_message="Both Azure and Postgres load failed",
+            )
+            failed_months.append(month_label)
+        # ── final report ──────────────────────────────────────────────────────────
+        logger.info(
+            f"[{PIPELINE_NAME}] Finished | "
+            f"success={len(all_months_summ)} "
+            f"skipped={len(skipped_months)} "
+            f"failed={len(failed_months)}",
+            extra={
+                "flow_run_id": prefect.runtime.flow_run.id,
+                "utc_time": pendulum.now("UTC").to_iso8601_string(),
+            },
+        )
+
+        if skipped_months:
+            logger.warning(f"[{PIPELINE_NAME}] Skipped (missing data): {skipped_months}")
+
+        if failed_months:
+            raise RuntimeError(
+                f"[{PIPELINE_NAME}] {len(failed_months)} month(s) failed: {failed_months}"
+            )
+
+    if __name__ == "__main__":
+        monthly_to_yearly_aggregation()
+
+
 
 

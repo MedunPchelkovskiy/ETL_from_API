@@ -586,3 +586,92 @@ def load_gold_monthly_summ_data_to_postgres_worker(
         except SQLAlchemyError:
             logger.exception("Failed to load monthly summ data for month number %s", month_number)
             raise
+
+def load_yearly_summ_data_to_azure_worker(yearly_agg_df):
+
+    year_str = str(yearly_agg_df["year"].iloc[0])
+    file_name = f"{year_str}.parquet"
+    # Convert to Parquet bytes
+    parquet_buffer = io.BytesIO()
+    yearly_agg_df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
+    parquet_bytes = parquet_buffer.getvalue()
+    upload_parquet_bytes(fs_client, config("BASE_DIR_YEARLY_SUMM_GOLD"), [year_str,
+                                                                           file_name],
+                         parquet_bytes)
+
+
+def load_gold_yearly_summ_data_to_postgres_worker(
+        engine,
+        yearly_agg_df: pd.DataFrame):
+    """
+    Loader for gold_yearly_summarized_data.
+    Expects pre-validated DataFrame from the monthly Gold layer.
+    Demonstrates batch INSERT with ON CONFLICT for portfolio scalability showcase.
+    """
+    logger = get_logger()
+
+    stmt = text("""
+        INSERT INTO gold_yearly_summarized_data (
+            place_name, generated_at,
+            period_type, year, year_start,
+            temp_max, temp_min, temp_avg,
+            rain_min, rain_max, rain_avg,
+            snow_min, snow_max, snow_avg,
+            wind_speed_min, wind_speed_max, wind_speed_avg,
+            cloud_cover_min, cloud_cover_max, cloud_cover_avg,
+            humidity_min, humidity_max, humidity_avg
+        ) VALUES (
+            :place_name, :generated_at,
+            :period_type, :year, :year_start,
+            :temp_max, :temp_min, :temp_avg,
+            :rain_min, :rain_max, :rain_avg,
+            :snow_min, :snow_max, :snow_avg,
+            :wind_speed_min, :wind_speed_max, :wind_speed_avg,
+            :cloud_cover_min, :cloud_cover_max, :cloud_cover_avg,
+            :humidity_min, :humidity_max, :humidity_avg
+        )
+        ON CONFLICT (place_name, year, month_number) DO NOTHING
+    """)
+
+    batch_size = int(1000)
+
+    if yearly_agg_df is None or yearly_agg_df.empty:
+        logger.warning("Gold monthly summ worker skip load: empty dataframe")
+
+    month_number = yearly_agg_df['month_number'].iloc[0]
+    year = yearly_agg_df['year'].iloc[0]
+
+    logger.info(
+        "Loading year",
+        year, month_number, yearly_agg_df.shape
+    )
+
+    total_inserted = 0
+    total_skipped = 0
+
+    try:
+        for start in range(0, len(yearly_agg_df), batch_size):
+            batch = yearly_agg_df.iloc[start: start + batch_size]
+            values = batch.to_dict(orient="records")
+
+            with engine.begin() as conn:
+                result = conn.execute(stmt, values)
+                inserted = result.rowcount or 0
+
+            skipped = len(values) - inserted
+            total_inserted += inserted
+            total_skipped += skipped
+
+            logger.info(
+                "Batch %s | inserted=%s | skipped=%s | size=%s",
+                start // batch_size + 1, inserted, skipped, len(values),
+            )
+
+        logger.info(
+            "Done year %s | total_inserted=%s | total_skipped=%s | total_rows=%s",
+            month_number, total_inserted, total_skipped, len(yearly_agg_df),
+        )
+
+    except SQLAlchemyError:
+        logger.exception("Failed to load yearly summ data for year %s", year)
+        raise

@@ -192,6 +192,22 @@ def load_gold_monthly_summ_data_to_postgres(pipeline_name, month_start, all_mont
                        }
                 )
 
+@task(
+    name="Load gold yearly summarized data to Azure", retries=3, retry_delay_seconds=30,
+)
+def load_gold_yearly_summ_data_to_azure():
+    logger = get_logger()
+    logger.info("Start task loading gold yearly data to Azure",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,})
+
+    load_yearly_summ_data_to_azure_worker()
+
+    logger.info("Completed task loading gold yearly data to Azure",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,}
+                )
+
 
 
 
