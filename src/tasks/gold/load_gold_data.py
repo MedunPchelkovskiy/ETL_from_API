@@ -10,7 +10,8 @@ from src.workers.gold.load_gold_data import load_gold_data_to_azure_worker, load
     load_five_day_data_to_postgres_worker, load_gold_five_day_data_to_azure_worker, \
     load_daily_summ_data_to_azure_worker, load_gold_daily_summ_data_to_postgres_worker, \
     load_weekly_summ_data_to_azure_worker, load_gold_weekly_summ_data_to_postgres_worker, \
-    load_monthly_summ_data_to_azure_worker, load_gold_monthly_summ_data_to_postgres_worker
+    load_monthly_summ_data_to_azure_worker, load_gold_monthly_summ_data_to_postgres_worker, \
+    load_yearly_summ_data_to_azure_worker, load_gold_yearly_summ_data_to_postgres_worker
 
 
 @task(name="Load gold daily data to Azure blob", retries=3, retry_delay_seconds=300)
@@ -194,18 +195,39 @@ def load_gold_monthly_summ_data_to_postgres(pipeline_name, month_start, all_mont
 
 @task(
     name="Load gold yearly summarized data to Azure", retries=3, retry_delay_seconds=30,
+    task_run_name="Load yearly Azure | {pipeline_name} | {year}"
 )
-def load_gold_yearly_summ_data_to_azure():
+def load_gold_yearly_summ_data_to_azure(PIPELINE_NAME, yearly_summ, year):
     logger = get_logger()
     logger.info("Start task loading gold yearly data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,
                        "task_run_id": runtime.task_run.id,})
 
-    load_yearly_summ_data_to_azure_worker()
+    load_yearly_summ_data_to_azure_worker(yearly_summ)
 
     logger.info("Completed task loading gold yearly data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,
                        "task_run_id": runtime.task_run.id,}
+                )
+
+
+
+@task(name="Load gold yearly summarized data to postgres", retries=3, retry_delay_seconds=60,
+      task_run_name="Load yearly Postgres | {pipeline_name} | {year}")
+def load_gold_yearly_summ_data_to_postgres(PIPELINE_NAME, yearly_summ: pd.DataFrame, year):
+    logger = get_logger()
+    logger.info("Start task loading gold yearly data to Postgres local",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,
+                       }
+                )
+    engine = create_engine(config("DB_CONN_RAW"))
+    load_gold_yearly_summ_data_to_postgres_worker(engine, yearly_summ)
+
+    logger.info("Completed task loading gold yearly data to Postgres local",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,
+                       }
                 )
 
 

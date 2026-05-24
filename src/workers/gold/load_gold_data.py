@@ -589,15 +589,14 @@ def load_gold_monthly_summ_data_to_postgres_worker(
 
 def load_yearly_summ_data_to_azure_worker(yearly_agg_df):
 
-    year_str = str(yearly_agg_df["year"].iloc[0])
+    year_str = str(yearly_agg_df["year_start"].iloc[0].year)
     file_name = f"{year_str}.parquet"
     # Convert to Parquet bytes
     parquet_buffer = io.BytesIO()
     yearly_agg_df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
     parquet_bytes = parquet_buffer.getvalue()
-    upload_parquet_bytes(fs_client, config("BASE_DIR_YEARLY_SUMM_GOLD"), [year_str,
-                                                                           file_name],
-                         parquet_bytes)
+    upload_parquet_bytes(fs_client, config("BASE_DIR_YEARLY_SUMM_GOLD"),
+                        [year_str,file_name], parquet_bytes)
 
 
 def load_gold_yearly_summ_data_to_postgres_worker(
@@ -612,8 +611,8 @@ def load_gold_yearly_summ_data_to_postgres_worker(
 
     stmt = text("""
         INSERT INTO gold_yearly_summarized_data (
-            place_name, generated_at,
-            period_type, year, year_start,
+            place_name, updated_at,
+            period_type, year_start,
             temp_max, temp_min, temp_avg,
             rain_min, rain_max, rain_avg,
             snow_min, snow_max, snow_avg,
@@ -621,8 +620,8 @@ def load_gold_yearly_summ_data_to_postgres_worker(
             cloud_cover_min, cloud_cover_max, cloud_cover_avg,
             humidity_min, humidity_max, humidity_avg
         ) VALUES (
-            :place_name, :generated_at,
-            :period_type, :year, :year_start,
+            :place_name, :updated_at,
+            :period_type, :year_start,
             :temp_max, :temp_min, :temp_avg,
             :rain_min, :rain_max, :rain_avg,
             :snow_min, :snow_max, :snow_avg,
@@ -630,46 +629,48 @@ def load_gold_yearly_summ_data_to_postgres_worker(
             :cloud_cover_min, :cloud_cover_max, :cloud_cover_avg,
             :humidity_min, :humidity_max, :humidity_avg
         )
-        ON CONFLICT (place_name, year, month_number) DO NOTHING
+        ON CONFLICT (place_name, year_start, period_type) DO UPDATE SET
+        temp_max = EXCLUDED.temp_max,
+        temp_min = EXCLUDED.temp_min,
+        temp_avg = EXCLUDED.temp_avg,
+        rain_min = EXCLUDED.rain_min,
+        rain_max = EXCLUDED.rain_max,
+        rain_avg = EXCLUDED.rain_avg,
+        snow_min = EXCLUDED.snow_min,
+        snow_max = EXCLUDED.snow_max,
+        snow_avg = EXCLUDED.snow_avg,
+        wind_speed_min = EXCLUDED.wind_speed_min,
+        wind_speed_max = EXCLUDED.wind_speed_max,
+        wind_speed_avg = EXCLUDED.wind_speed_avg,
+        cloud_cover_min = EXCLUDED.cloud_cover_min, 
+        cloud_cover_max = EXCLUDED.cloud_cover_max, 
+        cloud_cover_avg = EXCLUDED.cloud_cover_avg,
+        humidity_min = EXCLUDED.humidity_min, 
+        humidity_max = EXCLUDED.humidity_max, 
+        humidity_avg = EXCLUDED.humidity_avg
     """)
-
-    batch_size = int(1000)
 
     if yearly_agg_df is None or yearly_agg_df.empty:
         logger.warning("Gold monthly summ worker skip load: empty dataframe")
 
-    month_number = yearly_agg_df['month_number'].iloc[0]
-    year = yearly_agg_df['year'].iloc[0]
+    year = yearly_agg_df['year_start'].iloc[0]
 
     logger.info(
         "Loading year",
-        year, month_number, yearly_agg_df.shape
+        year, yearly_agg_df.shape
     )
-
-    total_inserted = 0
-    total_skipped = 0
+    values = yearly_agg_df.to_dict("records")
 
     try:
-        for start in range(0, len(yearly_agg_df), batch_size):
-            batch = yearly_agg_df.iloc[start: start + batch_size]
-            values = batch.to_dict(orient="records")
-
-            with engine.begin() as conn:
-                result = conn.execute(stmt, values)
-                inserted = result.rowcount or 0
-
+        with engine.begin() as conn:
+            result = conn.execute(stmt, values)
+            inserted = result.rowcount or 0
             skipped = len(values) - inserted
-            total_inserted += inserted
-            total_skipped += skipped
 
-            logger.info(
-                "Batch %s | inserted=%s | skipped=%s | size=%s",
-                start // batch_size + 1, inserted, skipped, len(values),
-            )
 
         logger.info(
-            "Done year %s | total_inserted=%s | total_skipped=%s | total_rows=%s",
-            month_number, total_inserted, total_skipped, len(yearly_agg_df),
+            "Done year %s | inserted=%s | skipped=%s | total_rows=%s",
+             year, inserted, skipped, len(values),
         )
 
     except SQLAlchemyError:

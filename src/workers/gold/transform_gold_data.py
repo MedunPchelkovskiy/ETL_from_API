@@ -157,7 +157,7 @@ def aggregate_months_to_year(dfs: list[tuple[pendulum.DateTime, pd.DataFrame]], 
     yearly_summ_df["year"] = year
     yearly_summ_df["year_start"] = pendulum.datetime(year, 1, 1).date()
     yearly_summ_df["period_type"] = "yearly"
-    yearly_summ_df["generated_at"] = pendulum.now("UTC")
+    yearly_summ_df["updated_at"] = pendulum.now("UTC")
 
     return yearly_summ_df
 
