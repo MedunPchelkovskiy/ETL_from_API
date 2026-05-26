@@ -4,7 +4,7 @@ import prefect
 from decouple import config
 from prefect import flow
 from prefect.states import Completed
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Boolean
 
 from src.clients.datalake_client import fs_client
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
@@ -232,7 +232,8 @@ def monthly_to_yearly_aggregation():
         )
 
         # ── load ─────────────────────────────────────────────────────────────────
-
+        azure_ok = False
+        postgres_ok = False
         try:
             load_gold_yearly_summ_data_to_azure(PIPELINE_NAME, yearly_summ)
             azure_ok = True
@@ -248,40 +249,38 @@ def monthly_to_yearly_aggregation():
         if azure_ok or postgres_ok:
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=month_start,
+                partition_date=pendulum.datetime(now.year, 1, 1),
                 status="success",
-                expected_count=expected_days,
-                actual_count=expected_days,
+                expected_count=expected_months,
+                actual_count=len(pending_months),
             )
         else:
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=month_start,
+                partition_date=pendulum.datetime(now.year, 1, 1),
                 status="failed",
-                expected_count=expected_days,
+                expected_count=expected_months,
                 actual_count=0,
                 error_type="missing_partitions",
                 error_message="Both Azure and Postgres load failed",
             )
-            failed_months.append(month_label)
         # ── final report ──────────────────────────────────────────────────────────
         logger.info(
             f"[{PIPELINE_NAME}] Finished | "
-            f"success={len(all_months_summ)} "
-            f"skipped={len(skipped_months)} "
-            f"failed={len(failed_months)}",
+            f"success={year} "
+            f"missed={len(missing_months)}",
             extra={
                 "flow_run_id": prefect.runtime.flow_run.id,
                 "utc_time": pendulum.now("UTC").to_iso8601_string(),
             },
         )
 
-        if skipped_months:
-            logger.warning(f"[{PIPELINE_NAME}] Skipped (missing data): {skipped_months}")
+        if missing_months:
+            logger.warning(f"[{PIPELINE_NAME}] Skipped (missing data): {missing_months}")
 
-        if failed_months:
+        if not azure_ok and not postgres_ok:
             raise RuntimeError(
-                f"[{PIPELINE_NAME}] {len(failed_months)} month(s) failed: {failed_months}"
+                f"[{PIPELINE_NAME}] Year {year} — both Azure and Postgres load failed"
             )
 
     if __name__ == "__main__":
