@@ -197,8 +197,8 @@ def aggregate_months_to_quarter(dfs: list[tuple[pendulum.DateTime, pd.DataFrame]
         humidity_avg=("humidity_avg", "mean"),
     ).reset_index().round(2)
     quarterly_summ_df["year"] = year
-    quarterly_summ_df["year_start"] = pendulum.datetime(year, QUARTER_START_MONTH[quarter], 1).date()
-    quarterly_summ_df["period_type"] = f"Q{quarter}"
+    quarterly_summ_df["period_start"] = pendulum.datetime(year, QUARTER_START_MONTH[quarter], 1).date() # тук 'QUARTER_START_MONTH' ще е базиран на старт на сезоните
+    quarterly_summ_df["period_name"] = {season_name} # може би ще направя мапър с имаената на сезоните с ключ началана дата("period_start")
     quarterly_summ_df["generated_at"] = pendulum.now("UTC")
 
     return quarterly_summ_df

@@ -8,8 +8,9 @@ from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG
 def get_pending_work(
         processing_level: str,
         statuses: list[str],
-        error_types: list,  # может да съдържа None → OR error_type IS NULL
+        error_types: list,  # може да съдържа None → OR error_type IS NULL
         max_retries: int,
+        period_name: str | None = None,
 ) -> list[pendulum.DateTime]:
     """
     Returns list of partition_dates (as pendulum.DateTime UTC)
@@ -56,7 +57,11 @@ def get_pending_work(
               {error_clause}
             ORDER BY partition_date
         """
-        params = (processing_level, *statuses, max_retries, *error_params)
+        params = [processing_level, *statuses, max_retries, *error_params]
+
+        if period_name:
+            query += f" AND period_name = %s"
+            params.append(period_name)
 
         with conn.cursor() as cur:
             cur.execute(query, params)

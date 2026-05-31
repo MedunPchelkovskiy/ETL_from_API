@@ -6,17 +6,17 @@ import psycopg2
 from decouple import config
 
 expected_months_map = {
-    1: ["jan", "feb", "mar"],
-    2: ["apr", "may", "jun"],
-    3: ["jul", "aug", "sep"],
-    4: ["oct", "nov", "dec"],
+    1: {1, 2, 3},
+    2: {4, 5, 6},
+    3: {7, 8, 9},
+    4: {10, 11, 12},
 }
 
 critical_month_map = {
-    1: "mar",
-    2: "jun",
-    3: "sep",
-    4: "dec",
+    1: 3,
+    2: 6,
+    3: 9,
+    4: 12,
 }
 
 def get_quarter(datetime_obj: pendulum.DateTime):

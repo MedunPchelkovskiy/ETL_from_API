@@ -14,7 +14,7 @@ from src.helpers.observability_helpers.state_helpers import reconcile_processing
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
 
-PIPELINE_NAME = "gold_yearly_Q"
+PIPELINE_NAME = "gold_yearly"     #TODO: Add season to build processing_level name in processing state table
 
 @flow(name="Aggregate monthly to quarterly flow")
 def monthly_to_quarterly_aggregation():
@@ -139,39 +139,45 @@ def monthly_to_quarterly_aggregation():
                     )
                     continue
 
-    # ── missing months gate ───────────────────────────────────────────────────
-    if len(missing_months) > max_missing:
-        current_retries = get_current_retry_count(PIPELINE_NAME, pendulum.datetime(now.year, 1, 1))
+        # ── missing months gate ─────────────────────────────────────────────────
+        max_missing = 1
 
-        if current_retries >= cfg["max_retries"] and expected_months == 12:
-            status = "abandoned"
-            error_message = (
-                f"Abandoned after {current_retries} retries — "
-                f"no source data available. Missing months: {[m.to_date_string() for m in missing_months]}"
+        if len(missing_months) > max_missing:
+            current_retries = get_current_retry_count(PIPELINE_NAME, month_start)
+
+            if current_retries >= cfg["max_retries"]:
+                status = "abandoned"
+                error_message = (
+                    f"Abandoned after {current_retries} retries — "
+                    f"no source data available. Missing days: {missing_days}"  # ← days не weeks
+                )
+                logger.error(
+                    f"[{PIPELINE_NAME}] Month {month_label} abandoned after "
+                    f"{current_retries} retries — manual review required"
+                )
+            else:
+                status = "pending"
+                error_message = f"Missing days: {missing_days}"  # ← days не weeks
+                logger.warning(
+                    f"[{PIPELINE_NAME}] Month {month_label} — "
+                    f"{len(missing_days)}/{month_start.days_in_month} missing days "  # ← не /4
+                    f"| retry {current_retries + 1}/{cfg['max_retries']}"
+                )
+
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=month_start,
+                status=status,
+                expected_count=month_start.days_in_month,  # ← динамично, не cfg
+                actual_count=month_start.days_in_month - len(missing_days),  # ← не 7 -
+                error_type="missing_partitions",
+                error_message=error_message,
             )
-            logger.error(f"[{PIPELINE_NAME}] Year {now.year} abandoned after {current_retries} retries")
-        else:
-            status = "pending"
-            error_message = f"Missing months: {[m.to_date_string() for m in missing_months]}"
+            skipped_months.append(month_label)
+            continue
+
+        if missing_days:
             logger.warning(
-                f"[{PIPELINE_NAME}] Year {now.year} — "
-                f"{len(missing_months)}/{expected_months} missing month(s) "
-                f"| retry {current_retries + 1}/{cfg['max_retries']}"
+                f"[{PIPELINE_NAME}] Month {month_label} — proceeding with "
+                f"{len(missing_days)} missing day(s): {missing_days}"  # ← days не weeks
             )
-
-        upsert_state_fn(
-            processing_level=PIPELINE_NAME,
-            partition_date=pendulum.datetime(now.year, 1, 1),
-            status=status,
-            expected_count=expected_months,
-            actual_count=expected_months - len(missing_months),
-            error_type="missing_partitions",
-            error_message=error_message,
-        )
-        return Completed(message="Skipped-InsufficientData")
-
-    if missing_months:
-        logger.warning(
-            f"[{PIPELINE_NAME}] Year {now.year} — proceeding with "
-            f"{len(missing_months)} missing month(s): {[m.to_date_string() for m in missing_months]}"
-        )

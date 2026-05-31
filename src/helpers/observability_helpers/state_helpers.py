@@ -79,7 +79,7 @@ def _find_existing_postgres(
 
 # ── state table helpers ───────────────────────────────────────────────────────
 
-def get_last_reconciled_date(pipeline_name: str) -> pendulum.DateTime | None:
+def get_last_reconciled_date(pipeline_name: str, period_name: str | None = None) -> pendulum.DateTime | None:
     """
     Returns the latest partition_date in processing_state for this pipeline.
     Used to determine reconcile start_date on subsequent runs.
@@ -87,15 +87,17 @@ def get_last_reconciled_date(pipeline_name: str) -> pendulum.DateTime | None:
     conn = psycopg2.connect(config("DB_CONN_RAW"))
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT MAX(partition_date)
-                FROM processing_state
-                WHERE processing_level = %s
-                  AND status != 'abandoned'
-                """,
-                (pipeline_name,),
-            )
+            query = """
+            SELECT MAX(partition_date)
+            FROM processing_state
+            WHERE processing_level = %s
+              AND status != 'abandoned'
+            """
+            params = [pipeline_name]
+            if period_name:
+                query += f" AND period_name = %s"
+                params.append(period_name)
+            cur.execute(query, params)
             row = cur.fetchone()
             if row and row[0]:
                 return pendulum.datetime(row[0].year, row[0].month, row[0].day, tz="UTC")
@@ -131,26 +133,26 @@ def upsert_state_fn(
         actual_count: int = None,
         error_type: str = None,
         error_message: str = None,
+        period_name: str | None = None,
 ):
     """Idempotent upsert for processing_state."""
     conn = psycopg2.connect(config("DB_CONN_RAW"))
+    completeness_ratio = round(actual_count / expected_count, 4) if expected_count else None
+    is_acceptable = completeness_ratio >= 1.0 if completeness_ratio is not None else None
 
     query = """
         INSERT INTO processing_state (
-            processing_level, partition_date, status,
-            expected_count, actual_count,
-            completeness_ratio, is_acceptable,
+            processing_level, partition_date,
+            status, expected_count, actual_count,
+            completeness_ratio, period_name, is_acceptable,
             updated_at, error_type, error_message
         )
         VALUES (
-            %s, %s, %s, %s, %s,
-            CASE WHEN %s IS NOT NULL AND %s IS NOT NULL
-                 THEN %s::float / NULLIF(%s, 0) ELSE NULL END,
-            CASE WHEN %s IS NOT NULL AND %s IS NOT NULL
-                 THEN (%s::float / NULLIF(%s, 0)) >= 1 ELSE NULL END,
-            NOW(), %s, %s
+            %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, NOW(), %s, %s
         )
         ON CONFLICT (processing_level, partition_date) DO UPDATE SET
+            period_name        = EXCLUDED.period_name,
             status             = EXCLUDED.status,
             expected_count     = EXCLUDED.expected_count,
             actual_count       = EXCLUDED.actual_count,
@@ -167,13 +169,11 @@ def upsert_state_fn(
         WHERE processing_state.status != 'abandoned';
     """
 
-    params = (
+    params = [
         processing_level, partition_date.date(), status,
-        expected_count, actual_count,
-        actual_count, expected_count, actual_count, expected_count,
-        actual_count, expected_count, actual_count, expected_count,
-        error_type, error_message,
-    )
+        expected_count, actual_count, completeness_ratio, period_name,
+        is_acceptable, error_type, error_message,
+    ]
 
     try:
         with conn.cursor() as cur:
