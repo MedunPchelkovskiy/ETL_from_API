@@ -5,6 +5,25 @@ import pendulum
 import psycopg2
 from decouple import config
 
+expected_months_map = {
+    1: ["jan", "feb", "mar"],
+    2: ["apr", "may", "jun"],
+    3: ["jul", "aug", "sep"],
+    4: ["oct", "nov", "dec"],
+}
+
+critical_month_map = {
+    1: "mar",
+    2: "jun",
+    3: "sep",
+    4: "dec",
+}
+
+def get_quarter(datetime_obj: pendulum.DateTime):
+    return (datetime_obj.month - 1) // 3 + 1
+
+
+
 
 def get_last_gold_timestamp_postgres(engine, table_name):
     """
