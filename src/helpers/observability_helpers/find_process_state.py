@@ -48,20 +48,28 @@ def get_pending_work(
             error_clause = ""
             error_params = []
 
+        conditions = [
+            "processing_level = %s",
+            f"status IN ({status_placeholders})",
+            "retry_count < %s",
+        ]
+        params = [processing_level, *statuses, max_retries, *error_params]
+
+        if error_clause:
+            conditions.append(error_clause.removeprefix("AND "))
+
+        if period_name:
+            conditions.append("period_name = %s")
+            params.append(period_name)
+
+        where_clause = " AND ".join(conditions)
+
         query = f"""
             SELECT partition_date
             FROM processing_state
-            WHERE processing_level = %s
-              AND status IN ({status_placeholders})
-              AND retry_count < %s  
-              {error_clause}
+            WHERE {where_clause}
             ORDER BY partition_date
         """
-        params = [processing_level, *statuses, max_retries, *error_params]
-
-        if period_name:
-            query += f" AND period_name = %s"
-            params.append(period_name)
 
         with conn.cursor() as cur:
             cur.execute(query, params)

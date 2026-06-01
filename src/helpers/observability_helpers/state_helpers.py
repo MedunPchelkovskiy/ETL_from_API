@@ -137,7 +137,7 @@ def upsert_state_fn(
 ):
     """Idempotent upsert for processing_state."""
     conn = psycopg2.connect(config("DB_CONN_RAW"))
-    completeness_ratio = round(actual_count / expected_count, 4) if expected_count else None
+    completeness_ratio = round(actual_count / expected_count, 4) if expected_count and actual_count is not None else None
     is_acceptable = completeness_ratio >= 1.0 if completeness_ratio is not None else None
 
     query = """
@@ -148,7 +148,7 @@ def upsert_state_fn(
             updated_at, error_type, error_message
         )
         VALUES (
-            %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s,
             %s, %s, NOW(), %s, %s
         )
         ON CONFLICT (processing_level, partition_date) DO UPDATE SET
@@ -171,8 +171,8 @@ def upsert_state_fn(
 
     params = [
         processing_level, partition_date.date(), status,
-        expected_count, actual_count, completeness_ratio, period_name,
-        is_acceptable, error_type, error_message,
+        expected_count, actual_count, completeness_ratio,
+        period_name, is_acceptable, error_type, error_message,
     ]
 
     try:
