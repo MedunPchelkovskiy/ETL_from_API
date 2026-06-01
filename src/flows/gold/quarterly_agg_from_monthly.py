@@ -14,7 +14,7 @@ from src.helpers.observability_helpers.state_helpers import reconcile_processing
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
 
-PIPELINE_NAME = "gold_yearly"     #TODO: Add season to build processing_level name in processing state table
+PIPELINE_NAME = "gold_yearly_seasonal"     #TODO: Add season to build processing_level name in processing state table
 
 @flow(name="Aggregate monthly to quarterly flow")
 def monthly_to_quarterly_aggregation():
@@ -30,9 +30,9 @@ def monthly_to_quarterly_aggregation():
         someone changing the deployment schedule accidentally, CI/CD redeployments with immediate execution
     """
 
-    if now.month not in [1, 4, 7, 10]:
-        logger.info("Not a quarterly month — skipping")
-        return Completed(message="Skipped-NonQuarter")
+    if now.month not in [3, 6, 9, 12]:
+        logger.info("Not a season start month — skipping")
+        return Completed(message="Skipped-NonSeasonal")
 
     logger.info(
         f"Starting {PIPELINE_NAME}",
@@ -48,7 +48,7 @@ def monthly_to_quarterly_aggregation():
     last_reconciled = get_last_reconciled_date(PIPELINE_NAME)
 
     if last_reconciled is None:
-        reconcile_start = pendulum.datetime(now.year, 1, 1)
+        reconcile_start = pendulum.datetime(now.year - 1, 12, 1)
         logger.info(f"[{PIPELINE_NAME}] First run — reconciling from {reconcile_start.to_date_string()}")
     else:
         reconcile_start = last_reconciled

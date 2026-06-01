@@ -4,7 +4,7 @@ completed_months = pendulum.now("UTC").month - 1
 
 max_missing_count = min(completed_months // 3, 4)
 
-QUARTER_START_MONTH = {1: 1, 2: 4, 3: 7, 4: 10}
+QUARTER_START_MONTH = {3: 'spring', 6: 'summer', 9: 'autumn', 12: 'winter'}
 
 PIPELINE_CONFIG = {
     "bronze_openweather": {
@@ -69,7 +69,7 @@ PIPELINE_CONFIG = {
         "postgres_date_col": "year_start",
         "max_retries": 3,
         },
-    "gold_yearly_Q": {
+    "gold_yearly_seasonal": {
         "grain": "month",
         "max_missing_ratio": 0.33,
         "expected_count": 3,
