@@ -4,6 +4,7 @@ import pandas as pd
 import pendulum
 import psycopg2
 from decouple import config
+from sqlalchemy import create_engine, text
 
 expected_months_map = {
     1: {1, 2, 3},
@@ -19,11 +20,36 @@ critical_month_map = {
     4: 12,
 }
 
+
 def get_quarter(datetime_obj: pendulum.DateTime):
     return (datetime_obj.month - 1) // 3 + 1
 
 
+def get_oldest_monthly_date_azure(fs_client, base_dir):
+    all_paths = sorted([str(p) for p in fs_client.ls(base_dir, detail=False)])
+    oldest_month = all_paths[0]
+    parts = oldest_month.split("/")
+    year = int(parts[-2])
+    month = int(parts[-1].replace(".parquet", ""))
 
+    return year, month
+
+def get_oldest_monthly_date_postgres(db_conn):
+    engine = create_engine(db_conn)
+    query = """
+       SELECT MIN(month_start)
+         FROM gold_monthly_summarized_data
+   """
+
+    with engine.connect() as conn:
+        result = conn.execute(text(query)).fetchone()
+    if result is None or result[0] is None:
+        raise ValueError("No data in gold_monthly_summarized_data")
+    oldest_month = result[0]
+    year = oldest_month.year
+    month = oldest_month.month
+
+    return year, month
 
 def get_last_gold_timestamp_postgres(engine, table_name):
     """

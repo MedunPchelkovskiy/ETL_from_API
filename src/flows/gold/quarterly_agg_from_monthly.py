@@ -3,10 +3,11 @@ import prefect
 from decouple import config
 from prefect import flow
 from prefect.states import Completed
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, false
 
 from src.clients.datalake_client import fs_client
-from src.helpers.gold.extract import get_quarter, expected_months_map, critical_month_map
+from src.helpers.gold.extract import get_quarter, expected_months_map, critical_month_map, \
+    get_oldest_monthly_date_azure, get_oldest_monthly_date_postgres
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.find_process_state import get_pending_work
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
@@ -42,14 +43,18 @@ def monthly_to_quarterly_aggregation():
         },
     )
     end_date = now.start_of("month")  # текущият месец excluded
-    expected_months = now.month - 1
-    max_missing = round(expected_months * max_missing_ratio)
+    max_missing = 1
 
     last_reconciled = get_last_reconciled_date(PIPELINE_NAME)
 
     if last_reconciled is None:
-        reconcile_start = pendulum.datetime(now.year - 1, 12, 1)
-        logger.info(f"[{PIPELINE_NAME}] First run — reconciling from {reconcile_start.to_date_string()}")
+        try:
+            year, month = get_oldest_monthly_date_azure(fs_client, config("BASE_DIR_MONTHLY_SUMM_GOLD"))
+        except Exception as e:
+            logger.warning(f"[{PIPELINE_NAME}] Azure failed, falling back to Postgres | {e}")
+            year, month = get_oldest_monthly_date_postgres(config("DB_CONN_RAW"))
+        reconcile_start = pendulum.datetime(year=year, month=month, day=1)
+        logger.info(f"[{PIPELINE_NAME}] First run — reconciling from {year}-{month}")
     else:
         reconcile_start = last_reconciled
         logger.info(
