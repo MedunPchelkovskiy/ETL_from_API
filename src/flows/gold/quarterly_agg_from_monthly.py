@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, false
 
 from src.clients.datalake_client import fs_client
 from src.helpers.gold.extract import get_quarter, expected_months_map, critical_month_map, \
-    get_oldest_monthly_date_azure, get_oldest_monthly_date_postgres
+    get_oldest_monthly_date_azure, get_oldest_monthly_date_postgres, group_months_by_season
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.find_process_state import get_pending_work
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
@@ -81,10 +81,7 @@ def monthly_to_quarterly_aggregation():
         logger.info(f"[{PIPELINE_NAME}] No pending months — nothing to do")
         return Completed(message="Skipped-AlreadyProcessed")
 
-    grouped = {}
-    for month in pending_months:
-        quarter = get_quarter(month)
-        grouped.setdefault(quarter, []).append(month)
+    grouped = group_months_by_season(pending_months)
 
     logger.info(f"[{PIPELINE_NAME}] {len(pending_months)} month(s) to process")
 

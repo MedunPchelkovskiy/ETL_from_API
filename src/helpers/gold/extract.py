@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Optional
 
 import pandas as pd
@@ -23,6 +24,58 @@ critical_month_map = {
 
 def get_quarter(datetime_obj: pendulum.DateTime):
     return (datetime_obj.month - 1) // 3 + 1
+
+def group_months_by_season(
+    pending_months: list[pendulum.DateTime],
+) -> dict[str, dict]:
+    """
+    Groups a list of month-start dates by seasons.
+
+    Returns a dictionary in the form:
+    {
+        period_name: {
+            "partition_date": <start of season>,
+            "months": [list of month dates in that season]
+        }
+    }
+
+    Winter is assigned to the year of Jan/Feb.
+    December is considered part of the following year's winter.
+    """
+    seasons = defaultdict(list)
+
+    for dt in pending_months:
+        month = dt.month
+        year = dt.year
+
+        if month in (12, 1, 2):
+            season_name = "winter"
+            season_year = year + 1 if month == 12 else year
+        elif month in (3, 4, 5):
+            season_name = "spring"
+            season_year = year
+        elif month in (6, 7, 8):
+            season_name = "summer"
+            season_year = year
+        else:
+            season_name = "autumn"
+            season_year = year
+
+        period_name = f"{season_name}_{season_year}"
+        seasons[period_name].append(dt)
+
+    result = {}
+
+    for period_name, months in seasons.items():
+        months = sorted(months)
+
+        result[period_name] = {
+            # first month in the season = partition boundary
+            "partition_date": months[0],
+            "months": months,
+        }
+
+    return result
 
 
 def get_oldest_monthly_date_azure(fs_client, base_dir):
