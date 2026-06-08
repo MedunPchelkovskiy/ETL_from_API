@@ -27,7 +27,7 @@ def get_quarter(datetime_obj: pendulum.DateTime):
 
 def group_months_by_season(
     pending_months: list[pendulum.DateTime],
-) -> dict[str, dict]:
+) -> dict[str, list[pendulum.DateTime]]:
     """
     Groups a list of month-start dates by seasons.
 

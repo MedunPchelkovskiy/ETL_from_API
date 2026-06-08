@@ -17,7 +17,7 @@ from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly
 
 PIPELINE_NAME = "gold_yearly_seasonal"     #TODO: Add season to build processing_level name in processing state table
 
-@flow(name="Aggregate monthly to quarterly flow")
+@flow(name="Aggregate monthly to seasonal flow")
 def monthly_to_quarterly_aggregation():
     logger = get_logger()
     now = pendulum.now("UTC")
@@ -92,7 +92,7 @@ def monthly_to_quarterly_aggregation():
     for season_label, season_months in grouped.items():
         season_name = season_label.split("_")[0]
         expected = expected_months_map[season_name]
-        missing = set(expected) - set(season_months)
+        missing = set(expected) - {dt.month for dt in season_months}
 
         if len(missing) > max_missing:
             missing_months.append(grouped[season_label])
@@ -122,12 +122,12 @@ def monthly_to_quarterly_aggregation():
                 )
                 try:
                     month_df = get_monthly_gold_postgres(month)
-                    all_seasons_dfs.setdefault(season_name, []).append((month, month_df))
+                    all_seasons_dfs.setdefault(season_label, []).append((month, month_df))
                     upsert_state_fn(
                         processing_level=PIPELINE_NAME,
                         partition_date=month,
                         status="success",
-                        expected_count=expected_months,
+                        expected_count=expected,
                     )
                 except Exception as e2:
                     logger.error(
@@ -138,7 +138,7 @@ def monthly_to_quarterly_aggregation():
                         processing_level=PIPELINE_NAME,
                         partition_date=month,
                         status="pending",
-                        expected_count=expected_months,
+                        expected_count=expected,
                     )
                     continue
 
