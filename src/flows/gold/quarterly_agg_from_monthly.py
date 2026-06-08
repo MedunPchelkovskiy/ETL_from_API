@@ -43,7 +43,7 @@ def monthly_to_quarterly_aggregation():
         },
     )
     end_date = now.start_of("month")  # текущият месец excluded
-    max_missing = 1
+    max_missing = 0
 
     last_reconciled = get_last_reconciled_date(PIPELINE_NAME)
 
@@ -86,34 +86,35 @@ def monthly_to_quarterly_aggregation():
     logger.info(f"[{PIPELINE_NAME}] {len(pending_months)} month(s) to process")
 
     # ── extract ───────────────────────────────────────────────────────────────
-    all_quarters_dfs = {}
+    all_seasons_dfs = {}   #TODO: change to all_seasons_dfs, all downstrteam processing will work based on season grouping!!!
     missing_months = []
 
-    for quarter_id, quarter_months in grouped.items():
-        expected = expected_months_map[quarter_id]
-        missing = set(expected) - set(quarter_months)
+    for season_label, season_months in grouped.items():
+        season_name = season_label.split("_")[0]
+        expected = expected_months_map[season_name]
+        missing = set(expected) - set(season_months)
 
-        if critical_month_map[quarter_id] in missing or len(missing) > 1:
-            missing_months.append(grouped[quarter_id])
+        if len(missing) > max_missing:
+            missing_months.append(grouped[season_label])
 
             continue
 
         upsert_state_fn(
             processing_level=PIPELINE_NAME,
-            partition_date=quarter_months[0],
+            partition_date=season_months[0],
             status="processing",
             expected_count=len(expected),
         )
-        for month in quarter_months:
+        for month in season_months:
             month_label = month.to_date_string()
             try:
                 month_df = get_monthly_gold_azure(month)
-                all_quarters_dfs.setdefault(quarter_id, []).append((month, month_df))
+                all_seasons_dfs.setdefault(season_label, []).append((month, month_df))
                 upsert_state_fn(
                     processing_level=PIPELINE_NAME,
                     partition_date=month,
                     status="success",
-                    expected_count=expected_months,
+                    expected_count=expected,
                 )
             except Exception as e:
                 logger.warning(
@@ -121,7 +122,7 @@ def monthly_to_quarterly_aggregation():
                 )
                 try:
                     month_df = get_monthly_gold_postgres(month)
-                    all_quarters_dfs.setdefault(quarter_id, []).append((month, month_df))
+                    all_seasons_dfs.setdefault(season_name, []).append((month, month_df))
                     upsert_state_fn(
                         processing_level=PIPELINE_NAME,
                         partition_date=month,

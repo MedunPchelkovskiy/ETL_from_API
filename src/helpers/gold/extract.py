@@ -8,18 +8,18 @@ from decouple import config
 from sqlalchemy import create_engine, text
 
 expected_months_map = {
-    1: {1, 2, 3},
-    2: {4, 5, 6},
-    3: {7, 8, 9},
-    4: {10, 11, 12},
+    "winter": {12, 1, 2},
+    "spring": {3, 4, 5},
+    "summer": {6, 7, 8},
+    "autumn": {9, 10, 11},
 }
 
-critical_month_map = {
-    1: 3,
-    2: 6,
-    3: 9,
-    4: 12,
-}
+# critical_month_map = {
+#     "winter": 1,
+#     "spring": 4,
+#     "summer": 8,
+#     "autumn": 11,
+# }
 
 
 def get_quarter(datetime_obj: pendulum.DateTime):
@@ -66,14 +66,9 @@ def group_months_by_season(
 
     result = {}
 
+    # - sorting season's months list to ensure partition_date is start of season month in processing_state table-
     for period_name, months in seasons.items():
-        months = sorted(months)
-
-        result[period_name] = {
-            # first month in the season = partition boundary
-            "partition_date": months[0],
-            "months": months,
-        }
+        result[period_name] = sorted(months)
 
     return result
 
