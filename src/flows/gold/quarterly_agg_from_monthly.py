@@ -3,10 +3,10 @@ import prefect
 from decouple import config
 from prefect import flow
 from prefect.states import Completed
-from sqlalchemy import create_engine, false
+from sqlalchemy import create_engine
 
 from src.clients.datalake_client import fs_client
-from src.helpers.gold.extract import get_quarter, expected_months_map, critical_month_map, \
+from src.helpers.gold.extract import expected_months_map, critical_month_map, \
     get_oldest_monthly_date_azure, get_oldest_monthly_date_postgres, group_months_by_season
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.find_process_state import get_pending_work
@@ -15,7 +15,8 @@ from src.helpers.observability_helpers.state_helpers import reconcile_processing
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
 
-PIPELINE_NAME = "gold_yearly_seasonal"     #TODO: Add season to build processing_level name in processing state table
+PIPELINE_NAME = "gold_yearly_seasonal"  # TODO: Add season to build processing_level name in processing state table
+
 
 @flow(name="Aggregate monthly to seasonal flow")
 def monthly_to_quarterly_aggregation():
@@ -86,16 +87,17 @@ def monthly_to_quarterly_aggregation():
     logger.info(f"[{PIPELINE_NAME}] {len(pending_months)} month(s) to process")
 
     # ── extract ───────────────────────────────────────────────────────────────
-    all_seasons_dfs = {}   #TODO: change to all_seasons_dfs, all downstrteam processing will work based on season grouping!!!
-    missing_months = []
+    all_seasons_dfs = {}  # TODO: change to all_seasons_dfs, all downstrteam processing will work based on season grouping!!!
+    missing_months = {}
 
     for season_label, season_months in grouped.items():
-        season_name = season_label.split("_")[0]
+        season_name, season_year = season_label.split("_")
+        season_year = int(season_year)
         expected = expected_months_map[season_name]
         missing = set(expected) - {dt.month for dt in season_months}
 
         if len(missing) > max_missing:
-            missing_months.append(grouped[season_label])
+            missing_months[season_label] = missing
 
             continue
 
@@ -143,44 +145,43 @@ def monthly_to_quarterly_aggregation():
                     continue
 
         # ── missing months gate ─────────────────────────────────────────────────
-        max_missing = 1
 
-        if len(missing_months) > max_missing:
-            current_retries = get_current_retry_count(PIPELINE_NAME, month_start)
+        if len(missing) > max_missing:
+            period_start = expected[0]
+            if season_name == "winter":
+                year = season_year - 1
+            else:
+                year = season_year
+            period_start = pendulum.datetime(year, period_start, 1)
+            current_retries = get_current_retry_count(PIPELINE_NAME, period_start)
 
             if current_retries >= cfg["max_retries"]:
                 status = "abandoned"
                 error_message = (
                     f"Abandoned after {current_retries} retries — "
-                    f"no source data available. Missing days: {missing_days}"  # ← days не weeks
+                    f"no source data available. Missing months: {missing}"  # ← days не weeks
                 )
                 logger.error(
-                    f"[{PIPELINE_NAME}] Month {month_label} abandoned after "
+                    f"[{PIPELINE_NAME}] Season {season_name} abandoned after "
                     f"{current_retries} retries — manual review required"
                 )
             else:
                 status = "pending"
-                error_message = f"Missing days: {missing_days}"  # ← days не weeks
+                error_message = f"Missing months: {missing}"
                 logger.warning(
-                    f"[{PIPELINE_NAME}] Month {month_label} — "
-                    f"{len(missing_days)}/{month_start.days_in_month} missing days "  # ← не /4
+                    f"[{PIPELINE_NAME}] Season {season_name} — "
+                    f"{len(missing)}/{len(expected)} missing months "
                     f"| retry {current_retries + 1}/{cfg['max_retries']}"
                 )
 
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=month_start,
+                partition_date=period_start,
                 status=status,
-                expected_count=month_start.days_in_month,  # ← динамично, не cfg
-                actual_count=month_start.days_in_month - len(missing_days),  # ← не 7 -
+                expected_count=len(expected),  # ← динамично, не cfg
+                actual_count= len(season_months),
                 error_type="missing_partitions",
                 error_message=error_message,
             )
             skipped_months.append(month_label)
             continue
-
-        if missing_days:
-            logger.warning(
-                f"[{PIPELINE_NAME}] Month {month_label} — proceeding with "
-                f"{len(missing_days)} missing day(s): {missing_days}"  # ← days не weeks
-            )
