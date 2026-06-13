@@ -17,7 +17,7 @@ from src.helpers.observability_helpers.state_helpers import reconcile_processing
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
 from src.tasks.gold.transform_gold_data import get_seasonally_summ_data
 
-PIPELINE_NAME = "gold_yearly_seasonal"  # TODO: Add season to build processing_level name in processing state table
+PIPELINE_NAME = "gold_seasonal"  # TODO: Add season to build processing_level name in processing state table
 
 
 @flow(name="Aggregate monthly to seasonal flow")
@@ -26,7 +26,6 @@ def monthly_to_quarterly_aggregation():
     now = pendulum.now("UTC")
     engine = create_engine(config("DB_CONN_RAW"))
     cfg = PIPELINE_CONFIG[PIPELINE_NAME]
-    max_missing_ratio = cfg["max_missing_ratio"]
 
     # ── early gate ────────────────────────────────────────────────────────────
     """
@@ -118,7 +117,7 @@ def monthly_to_quarterly_aggregation():
                     processing_level=PIPELINE_NAME,
                     partition_date=month,
                     status="success",
-                    expected_count=expected,
+                    expected_count=len(expected),
                 )
             except Exception as e:
                 logger.warning(
@@ -131,37 +130,40 @@ def monthly_to_quarterly_aggregation():
                         processing_level=PIPELINE_NAME,
                         partition_date=month,
                         status="success",
-                        expected_count=expected,
+                        expected_count=len(expected),
                     )
                 except Exception as e2:
                     logger.error(
                         f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}"
                     )
-                    missing_months[season_label] = month
+                    missing_months.setdefault(season_label, set()).add(month.month)
                     upsert_state_fn(
                         processing_level=PIPELINE_NAME,
                         partition_date=month,
                         status="pending",
-                        expected_count=expected,
+                        expected_count=len(expected),
                     )
                     continue
 
         # ── missing months gate ─────────────────────────────────────────────────
 
-        if len(missing) > max_missing:
-            period_start = expected[0]
+        runtime_missing = missing_months.get(season_label, set())
+        total_missing = missing | runtime_missing
+
+        if len(total_missing) > max_missing:
+            period_start_month = int(min(expected))
             if season_name == "winter":
                 year = season_year - 1
             else:
                 year = season_year
-            period_start = pendulum.datetime(year, period_start, 1)
-            current_retries = get_current_retry_count(PIPELINE_NAME, period_start)
+            period_start_month = pendulum.datetime(year, period_start_month, 1)
+            current_retries = get_current_retry_count(PIPELINE_NAME, period_start_month)
 
             if current_retries >= cfg["max_retries"]:
                 status = "abandoned"
                 error_message = (
                     f"Abandoned after {current_retries} retries — "
-                    f"no source data available. Missing months: {missing}"  # ← days не weeks
+                    f"no source data available. Missing months: {total_missing}"
                 )
                 logger.error(
                     f"[{PIPELINE_NAME}] Season {season_name} abandoned after "
@@ -169,18 +171,18 @@ def monthly_to_quarterly_aggregation():
                 )
             else:
                 status = "pending"
-                error_message = f"Missing months: {missing}"
+                error_message = f"Missing months: {total_missing}"
                 logger.warning(
                     f"[{PIPELINE_NAME}] Season {season_name} — "
-                    f"{len(missing)}/{len(expected)} missing months "
+                    f"{len(total_missing)}/{len(expected)} missing months "
                     f"| retry {current_retries + 1}/{cfg['max_retries']}"
                 )
 
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=period_start,
+                partition_date=period_start_month,
                 status=status,
-                expected_count=len(expected),  # ← dynamically, not cfg
+                expected_count=len(expected),
                 actual_count=len(season_months),
                 error_type="missing_partitions",
                 error_message=error_message,
@@ -189,27 +191,27 @@ def monthly_to_quarterly_aggregation():
             continue
 
     # ── transform ─────────────────────────────────────────────────
-
+    season_data_aggregated = {}
     for season_label, data in all_seasons_dfs.items():
         season, year = season_label.split("_")
         year = int(year)
-        period_start = data[0][0]
+        period_start_month = data[0][0]
         try:
             season_summ = get_seasonally_summ_data(season, year, data)
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=pendulum.datetime(year, 1, 1),
+                partition_date=period_start_month,
                 status="success",
-                expected_count=expected,
+                expected_count= len(expected_months_map[season]),
             )
 
         except DataIssueError as e:
             # data / business issue
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=period_start,
+                partition_date=period_start_month,
                 status="pending",
-                expected_count=len(expected),  # ← dynamically, not cfg
+                expected_count=len(expected_months_map[season]),
                 error_message=str(e),
             )
             continue
@@ -218,8 +220,13 @@ def monthly_to_quarterly_aggregation():
             # bug / unexpected
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=period_start,
+                partition_date=period_start_month,
                 status="failed",
                 error_message=str(e)
             )
             raise
+        season_data_aggregated[season_label] = season_summ
+
+
+    # ── load ─────────────────────────────────────────────────
+

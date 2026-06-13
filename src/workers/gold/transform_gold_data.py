@@ -1,6 +1,7 @@
 import pandas as pd
 import pendulum
 
+from src.core.exceptions import InsufficientMonthsError
 from src.helpers.observability_helpers.pipeline_config import QUARTER_START_MONTH
 
 
@@ -167,16 +168,16 @@ def aggregate_months_to_season(season, year, data) -> pd.DataFrame:
     min_required = 3
 
     if len(not_empty_dfs) < min_required:
-        raise ValueError(
+        raise InsufficientMonthsError(
             f"Insufficient data for {season}: "
-            f"{len(not_empty_dfs)}/ 3 months available, "
+            f"{len(not_empty_dfs)}/{min_required} months available, "
             f"minimum required: {min_required}"
         )
 
     combined_df = pd.concat(not_empty_dfs, ignore_index=True)
     period_start = data[0][0]
 
-    quarterly_summ_df = combined_df.groupby(["place_name"]).agg(
+    seasonally_summ_df = combined_df.groupby(["place_name"]).agg(
         temp_max=('temp_max', 'max'),
         temp_min=('temp_min', 'min'),
         temp_avg=('temp_avg', 'mean'),
@@ -196,10 +197,10 @@ def aggregate_months_to_season(season, year, data) -> pd.DataFrame:
         humidity_min=("humidity_min", "min"),
         humidity_avg=("humidity_avg", "mean"),
     ).reset_index().round(2)
-    quarterly_summ_df["year"] = year
-    quarterly_summ_df["season_start"] = period_start
-    quarterly_summ_df["season_name"] = season # може би ще направя мапър с имаената на сезоните с ключ началана дата("period_start")
-    quarterly_summ_df["generated_at"] = pendulum.now("UTC")
+    seasonally_summ_df["year"] = year
+    seasonally_summ_df["period_start"] = period_start
+    seasonally_summ_df["period_type"] = season # може би ще направя мапър с имаената на сезоните с value началана дата("period_start")
+    seasonally_summ_df["generated_at"] = pendulum.now("UTC")
 
-    return quarterly_summ_df
+    return seasonally_summ_df
 
