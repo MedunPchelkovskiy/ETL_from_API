@@ -6,6 +6,7 @@ from prefect.states import Completed
 from sqlalchemy import create_engine
 
 from src.clients.datalake_client import fs_client
+from src.core.exceptions import DataIssueError
 from src.helpers.gold.extract import expected_months_map, critical_month_map, \
     get_oldest_monthly_date_azure, get_oldest_monthly_date_postgres, group_months_by_season
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
@@ -14,6 +15,7 @@ from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, P
 from src.helpers.observability_helpers.state_helpers import reconcile_processing_state, get_last_reconciled_date, \
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
+from src.tasks.gold.transform_gold_data import get_seasonally_summ_data
 
 PIPELINE_NAME = "gold_yearly_seasonal"  # TODO: Add season to build processing_level name in processing state table
 
@@ -87,7 +89,7 @@ def monthly_to_quarterly_aggregation():
     logger.info(f"[{PIPELINE_NAME}] {len(pending_months)} month(s) to process")
 
     # ── extract ───────────────────────────────────────────────────────────────
-    all_seasons_dfs = {}  # TODO: change to all_seasons_dfs, all downstrteam processing will work based on season grouping!!!
+    all_seasons_dfs = {}
     missing_months = {}
 
     for season_label, season_months in grouped.items():
@@ -135,7 +137,7 @@ def monthly_to_quarterly_aggregation():
                     logger.error(
                         f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}"
                     )
-                    missing_months.append(month)
+                    missing_months[season_label] = month
                     upsert_state_fn(
                         processing_level=PIPELINE_NAME,
                         partition_date=month,
@@ -178,10 +180,46 @@ def monthly_to_quarterly_aggregation():
                 processing_level=PIPELINE_NAME,
                 partition_date=period_start,
                 status=status,
-                expected_count=len(expected),  # ← динамично, не cfg
-                actual_count= len(season_months),
+                expected_count=len(expected),  # ← dynamically, not cfg
+                actual_count=len(season_months),
                 error_type="missing_partitions",
                 error_message=error_message,
             )
-            skipped_months.append(month_label)
+
             continue
+
+    # ── transform ─────────────────────────────────────────────────
+
+    for season_label, data in all_seasons_dfs.items():
+        season, year = season_label.split("_")
+        year = int(year)
+        period_start = data[0][0]
+        try:
+            season_summ = get_seasonally_summ_data(season, year, data)
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=pendulum.datetime(year, 1, 1),
+                status="success",
+                expected_count=expected,
+            )
+
+        except DataIssueError as e:
+            # data / business issue
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=period_start,
+                status="pending",
+                expected_count=len(expected),  # ← dynamically, not cfg
+                error_message=str(e),
+            )
+            continue
+
+        except Exception as e:
+            # bug / unexpected
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=period_start,
+                status="failed",
+                error_message=str(e)
+            )
+            raise

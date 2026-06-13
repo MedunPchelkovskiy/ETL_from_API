@@ -162,19 +162,19 @@ def aggregate_months_to_year(dfs: list[tuple[pendulum.DateTime, pd.DataFrame]], 
     return yearly_summ_df
 
 
-def aggregate_months_to_quarter(dfs: list[tuple[pendulum.DateTime, pd.DataFrame]], year, quarter,enough_months) -> pd.DataFrame:
-    not_empty_dfs = [df for ts, df in dfs if not df.empty and ts in enough_months]
-    min_required = 2
+def aggregate_months_to_season(season, year, data) -> pd.DataFrame:
+    not_empty_dfs = [df for ts, df in data if not df.empty]
+    min_required = 3
 
     if len(not_empty_dfs) < min_required:
         raise ValueError(
-            f"Insufficient data for {year}: "
+            f"Insufficient data for {season}: "
             f"{len(not_empty_dfs)}/ 3 months available, "
             f"minimum required: {min_required}"
         )
 
     combined_df = pd.concat(not_empty_dfs, ignore_index=True)
-    period_start = dfs[0][0]
+    period_start = data[0][0]
 
     quarterly_summ_df = combined_df.groupby(["place_name"]).agg(
         temp_max=('temp_max', 'max'),
@@ -197,8 +197,8 @@ def aggregate_months_to_quarter(dfs: list[tuple[pendulum.DateTime, pd.DataFrame]
         humidity_avg=("humidity_avg", "mean"),
     ).reset_index().round(2)
     quarterly_summ_df["year"] = year
-    quarterly_summ_df["period_start"] = pendulum.datetime(year, QUARTER_START_MONTH[quarter], 1).date() # тук 'QUARTER_START_MONTH' ще е базиран на старт на сезоните
-    quarterly_summ_df["period_name"] = {season_name} # може би ще направя мапър с имаената на сезоните с ключ началана дата("period_start")
+    quarterly_summ_df["season_start"] = period_start
+    quarterly_summ_df["season_name"] = season # може би ще направя мапър с имаената на сезоните с ключ началана дата("period_start")
     quarterly_summ_df["generated_at"] = pendulum.now("UTC")
 
     return quarterly_summ_df

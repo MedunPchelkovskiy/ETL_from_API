@@ -7,7 +7,7 @@ from sqlalchemy_utils.types import password
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.gold.transform_gold_data import get_daily_summ_data_worker, get_weekly_summ_data_worker, \
-    get_monthly_summ_data_worker, aggregate_months_to_year, aggregate_months_to_quarter
+    get_monthly_summ_data_worker, aggregate_months_to_year, aggregate_months_to_season
 
 
 @task(name="Transform gold data to daily")
@@ -67,12 +67,13 @@ def aggregate_gold_months(all_months_dfs, expected_months, max_missing_ratio, ye
     return aggregated_months_dfs
 
 
-@task(name="Transform gold monthly data to quarterly",
-      task_run_name="Transform monthly Q | {year}")
-def agregate_months_quarter(all_months_dfs, year, quarter, enough_months) -> pd.DataFrame:
+
+@task(name="Transform gold monthly data to seasonally",
+      task_run_name="Transform monthly to seasonally | {year}")
+def get_seasonally_summ_data(season, year, data) -> pd.DataFrame:
     logger = get_logger()
-    logger.info(f"Start task aggregate monthly to quarter data")
-    aggregated_quarter = aggregate_months_to_quarter(all_months_dfs, year, quarter, enough_months)
-    logger.info(f"End task aggregate monthly to quarter data")
+    logger.info(f"Start task aggregate monthly to seasonally data for {season}_{year}")
+    aggregated_quarter = aggregate_months_to_season(season, year, data)
+    logger.info(f"End task aggregate monthly to seasonally data for {season}_{year}")
 
     return aggregated_quarter

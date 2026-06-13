@@ -1,15 +1,14 @@
-import pandas as pd
+import pendulum
 import pendulum
 import prefect
 from decouple import config
 from prefect import flow
 from prefect.states import Completed
-from sqlalchemy import create_engine, Boolean
+from sqlalchemy import create_engine
 
 from src.clients.datalake_client import fs_client
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.find_process_state import get_pending_work
-from src.helpers.observability_helpers.initial_run_states import generate_dates
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
     upsert_state_fn, get_current_retry_count, enough_months_quarter
@@ -18,6 +17,7 @@ from src.tasks.gold.load_gold_data import load_gold_yearly_summ_data_to_azure, l
 from src.tasks.gold.transform_gold_data import aggregate_gold_months, agregate_months_quarter
 
 PIPELINE_NAME = "gold_yearly"
+
 
 @flow(name="Aggregate monthly to yearly flow")
 def monthly_to_yearly_aggregation():
@@ -202,7 +202,7 @@ def monthly_to_yearly_aggregation():
     enough_months = enough_months_quarter(year, quarter)
     if len(enough_months) >= 2:
         try:
-            quarterly_sum = agregate_months_quarter(all_months_dfs, year, quarter,enough_months)
+            quarterly_sum = agregate_months_quarter(all_months_dfs, year, quarter, enough_months)
             # upsert_state_fn(
             #     processing_level=PIPELINE_NAME,
             #     partition_date=pendulum.datetime(year, 1, 1),
@@ -285,7 +285,3 @@ def monthly_to_yearly_aggregation():
 
     if __name__ == "__main__":
         monthly_to_yearly_aggregation()
-
-
-
-
