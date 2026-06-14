@@ -173,7 +173,7 @@ def monthly_to_yearly_aggregation():
         #     processing_level=PIPELINE_NAME,
         #     partition_date=pendulum.datetime(year, 1, 1),
         #     status="success",
-        #     expected_count=expected_months,
+        #     expected_count=                           ,
         # )
     except ValueError as e:
         upsert_state_fn(

@@ -11,7 +11,8 @@ from src.workers.gold.load_gold_data import load_gold_data_to_azure_worker, load
     load_daily_summ_data_to_azure_worker, load_gold_daily_summ_data_to_postgres_worker, \
     load_weekly_summ_data_to_azure_worker, load_gold_weekly_summ_data_to_postgres_worker, \
     load_monthly_summ_data_to_azure_worker, load_gold_monthly_summ_data_to_postgres_worker, \
-    load_yearly_summ_data_to_azure_worker, load_gold_yearly_summ_data_to_postgres_worker
+    load_yearly_summ_data_to_azure_worker, load_gold_yearly_summ_data_to_postgres_worker, \
+    load_seasonal_summ_data_to_azure_worker
 
 
 @task(name="Load gold daily data to Azure blob", retries=3, retry_delay_seconds=300)
@@ -232,5 +233,20 @@ def load_gold_yearly_summ_data_to_postgres(PIPELINE_NAME, yearly_summ: pd.DataFr
 
 
 
+@task(
+    name="Load gold seasonal summarized data to Azure", retries=3, retry_delay_seconds=30,
+    task_run_name="Load seasonal to Azure | {pipeline_name} | {season_label}"
+)
+def load_gold_seasonal_summ_data_to_azure(PIPELINE_NAME, season_label, df):
+    logger = get_logger()
+    logger.info("Start task loading gold seasonal data to Azure",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,})
 
+    load_seasonal_summ_data_to_azure_worker(df, season_label)
+
+    logger.info("Completed task loading gold seasonal data to Azure",
+                extra={"flow_run_id": runtime.flow_run.id,
+                       "task_run_id": runtime.task_run.id,}
+                )
 

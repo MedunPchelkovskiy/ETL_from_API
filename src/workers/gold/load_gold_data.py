@@ -676,3 +676,16 @@ def load_gold_yearly_summ_data_to_postgres_worker(
     except SQLAlchemyError:
         logger.exception("Failed to load yearly summ data for year %s", year)
         raise
+
+
+
+def load_seasonal_summ_data_to_azure_worker(seasonal_agg_df):
+    year_str = str(seasonal_agg_df["year"])
+    period_type = str(seasonal_agg_df["period_type"])
+    file_name = f"{period_type}_{year_str}.parquet"
+    # Convert to Parquet bytes
+    parquet_buffer = io.BytesIO()
+    seasonal_agg_df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
+    parquet_bytes = parquet_buffer.getvalue()
+    upload_parquet_bytes(fs_client, config("BASE_DIR_SEASONALLY_SUMM_GOLD"),
+                        [year_str,file_name], parquet_bytes)

@@ -15,6 +15,7 @@ from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, P
 from src.helpers.observability_helpers.state_helpers import reconcile_processing_state, get_last_reconciled_date, \
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
+from src.tasks.gold.load_gold_data import load_gold_seasonal_summ_data_to_azure
 from src.tasks.gold.transform_gold_data import get_seasonally_summ_data
 
 PIPELINE_NAME = "gold_seasonal"  # TODO: Add season to build processing_level name in processing state table
@@ -202,7 +203,7 @@ def monthly_to_quarterly_aggregation():
                 processing_level=PIPELINE_NAME,
                 partition_date=period_start_month,
                 status="success",
-                expected_count= len(expected_months_map[season]),
+                expected_count=len(expected_months_map[season]),
             )
 
         except DataIssueError as e:
@@ -227,6 +228,39 @@ def monthly_to_quarterly_aggregation():
             raise
         season_data_aggregated[season_label] = season_summ
 
-
     # ── load ─────────────────────────────────────────────────
 
+    for season_label, df in season_data_aggregated.items():
+
+        azure_ok = False
+        postgres_ok = False
+        try:
+            load_gold_seasonal_summ_data_to_azure(PIPELINE_NAME, season_label, df)
+            azure_ok = True
+        except Exception:
+            logger.exception(f"[{PIPELINE_NAME}] Azure upload failed for {season_label}")
+
+        try:
+            load_gold_yearly_summ_data_to_postgres(PIPELINE_NAME, df, season_label)
+            postgres_ok = True
+        except Exception:
+            logger.exception(f"[{PIPELINE_NAME}] Postgres load failed for {year}")
+
+        if azure_ok or postgres_ok:
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=pendulum.datetime(now.year, 1, 1),
+                status="success",
+                expected_count=expected_months,
+                actual_count=len(pending_months),
+            )
+        else:
+            upsert_state_fn(
+                processing_level=PIPELINE_NAME,
+                partition_date=pendulum.datetime(now.year, 1, 1),
+                status="failed",
+                expected_count=expected_months,
+                actual_count=0,
+                error_type="missing_partitions",
+                error_message="Both Azure and Postgres load failed",
+            )
