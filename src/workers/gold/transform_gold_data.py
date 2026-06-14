@@ -127,7 +127,7 @@ def aggregate_months_to_year(dfs: list[tuple[pendulum.DateTime, pd.DataFrame]], 
 
 
     if len(not_empty_dfs) < min_required:
-        raise ValueError(
+        raise InsufficientMonthsError(
             f"Insufficient data for {year}: "
             f"{len(not_empty_dfs)}/{expected_months} months available, "
             f"minimum required: {min_required}"
@@ -156,7 +156,7 @@ def aggregate_months_to_year(dfs: list[tuple[pendulum.DateTime, pd.DataFrame]], 
         humidity_avg=("humidity_avg", "mean"),
     ).reset_index().round(2)
     yearly_summ_df["year"] = year
-    yearly_summ_df["year_start"] = pendulum.datetime(year, 1, 1).date()
+    yearly_summ_df["period_start"] = pendulum.datetime(year, 1, 1).date()
     yearly_summ_df["period_type"] = "yearly"
     yearly_summ_df["updated_at"] = pendulum.now("UTC")
 

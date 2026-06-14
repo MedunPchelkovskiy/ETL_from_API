@@ -1,5 +1,4 @@
 import pendulum
-import pendulum
 import prefect
 from decouple import config
 from prefect import flow
@@ -7,14 +6,15 @@ from prefect.states import Completed
 from sqlalchemy import create_engine
 
 from src.clients.datalake_client import fs_client
+from src.core.exceptions import DataIssueError
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.find_process_state import get_pending_work
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP
 from src.helpers.observability_helpers.state_helpers import get_last_reconciled_date, reconcile_processing_state, \
-    upsert_state_fn, get_current_retry_count, enough_months_quarter
+    upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
 from src.tasks.gold.load_gold_data import load_gold_yearly_summ_data_to_azure, load_gold_yearly_summ_data_to_postgres
-from src.tasks.gold.transform_gold_data import aggregate_gold_months, agregate_months_quarter
+from src.tasks.gold.transform_gold_data import aggregate_gold_months
 
 PIPELINE_NAME = "gold_yearly"
 
@@ -40,7 +40,7 @@ def monthly_to_yearly_aggregation():
         },
     )
 
-    end_date = now.start_of("month")  # текущият месец excluded
+    end_date = now.start_of("month")
     expected_months = now.month - 1
     max_missing = round(expected_months * max_missing_ratio)
 
@@ -164,28 +164,21 @@ def monthly_to_yearly_aggregation():
             f"{len(missing_months)} missing month(s): {[m.to_date_string() for m in missing_months]}"
         )
 
-    # ── transform ─────────────────────────────────────────────────────────
-
+    # ── transform ────────────────────────────────────────────────────────────
+    year = now.year
     try:
-        year = now.year
         yearly_summ = aggregate_gold_months(all_months_dfs, expected_months, max_missing_ratio, year)
-        # upsert_state_fn(
-        #     processing_level=PIPELINE_NAME,
-        #     partition_date=pendulum.datetime(year, 1, 1),
-        #     status="success",
-        #     expected_count=                           ,
-        # )
-    except ValueError as e:
+    except DataIssueError as e:
         upsert_state_fn(
             processing_level=PIPELINE_NAME,
             partition_date=pendulum.datetime(year, 1, 1),
-            status="failed",
+            status="pending",
             expected_count=expected_months,
             actual_count=len(all_months_dfs),
             error_type="insufficient_data",
             error_message=str(e),
         )
-        return
+        return Completed(message="Skipped-InsufficientData")
     except Exception as e:
         upsert_state_fn(
             processing_level=PIPELINE_NAME,
@@ -196,92 +189,59 @@ def monthly_to_yearly_aggregation():
             error_type="transformation_error",
             error_message=str(e),
         )
-        return
+        return Completed(message="Failed-TransformError")
 
-    quarter = (pendulum.now().month - 1) // 3 + 1
-    enough_months = enough_months_quarter(year, quarter)
-    if len(enough_months) >= 2:
-        try:
-            quarterly_sum = agregate_months_quarter(all_months_dfs, year, quarter, enough_months)
-            # upsert_state_fn(
-            #     processing_level=PIPELINE_NAME,
-            #     partition_date=pendulum.datetime(year, 1, 1),
-            #     status="success",
-            #     expected_count=expected_months,
-            # )
-        except ValueError as e:
-            upsert_state_fn(
-                processing_level=PIPELINE_NAME,
-                partition_date=pendulum.datetime(year, 1, 1),
-                status="failed",
-                expected_count=expected_months,
-                actual_count=len(all_months_dfs),
-                error_type="insufficient_data",
-                error_message=str(e),
-            )
-    else:
-        error_message = f"Missing days {3 - len(missing_months)}"
+    # ── load ─────────────────────────────────────────────────────────────────
+    azure_ok = False
+    postgres_ok = False
+    try:
+        load_gold_yearly_summ_data_to_azure(PIPELINE_NAME, yearly_summ)
+        azure_ok = True
+    except Exception:
+        logger.exception(f"[{PIPELINE_NAME}] Azure upload failed for {year}")
+
+    try:
+        load_gold_yearly_summ_data_to_postgres(PIPELINE_NAME, yearly_summ, year)
+        postgres_ok = True
+    except Exception:
+        logger.exception(f"[{PIPELINE_NAME}] Postgres load failed for {year}")
+
+    if azure_ok or postgres_ok:
         upsert_state_fn(
             processing_level=PIPELINE_NAME,
-            partition_date=pendulum.datetime(year, 1, 1),
+            partition_date=pendulum.datetime(now.year, 1, 1),
+            status="success",
+            expected_count=expected_months,
+            actual_count=len(pending_months),
+        )
+    else:
+        upsert_state_fn(
+            processing_level=PIPELINE_NAME,
+            partition_date=pendulum.datetime(now.year, 1, 1),
             status="failed",
-            expected_count=3,
-            actual_count=len(enough_months),
-            error_type="insufficient_data",
-            error_message=error_message,
+            expected_count=expected_months,
+            actual_count=0,
+            error_type="missing_partitions",
+            error_message="Both Azure and Postgres load failed",
         )
 
-        # ── load ─────────────────────────────────────────────────────────────────
-        azure_ok = False
-        postgres_ok = False
-        try:
-            load_gold_yearly_summ_data_to_azure(PIPELINE_NAME, yearly_summ)
-            azure_ok = True
-        except Exception:
-            logger.exception(f"[{PIPELINE_NAME}] Azure upload failed for {year}")
+    # ── final report ──────────────────────────────────────────────────────────
+    logger.info(
+        f"[{PIPELINE_NAME}] Finished | "
+        f"year={year} | "
+        f"missed={len(missing_months)}",
+        extra={
+            "flow_run_id": prefect.runtime.flow_run.id,
+            "utc_time": pendulum.now("UTC").to_iso8601_string(),
+        },
+    )
 
-        try:
-            load_gold_yearly_summ_data_to_postgres(PIPELINE_NAME, yearly_summ, year)
-            postgres_ok = True
-        except Exception:
-            logger.exception(f"[{PIPELINE_NAME}] Postgres load failed for {year}")
+    if missing_months:
+        logger.warning(f"[{PIPELINE_NAME}] Skipped (missing data): {missing_months}")
 
-        if azure_ok or postgres_ok:
-            upsert_state_fn(
-                processing_level=PIPELINE_NAME,
-                partition_date=pendulum.datetime(now.year, 1, 1),
-                status="success",
-                expected_count=expected_months,
-                actual_count=len(pending_months),
-            )
-        else:
-            upsert_state_fn(
-                processing_level=PIPELINE_NAME,
-                partition_date=pendulum.datetime(now.year, 1, 1),
-                status="failed",
-                expected_count=expected_months,
-                actual_count=0,
-                error_type="missing_partitions",
-                error_message="Both Azure and Postgres load failed",
-            )
-        # ── final report ──────────────────────────────────────────────────────────
-        logger.info(
-            f"[{PIPELINE_NAME}] Finished | "
-            f"success={year} "
-            f"missed={len(missing_months)}",
-            extra={
-                "flow_run_id": prefect.runtime.flow_run.id,
-                "utc_time": pendulum.now("UTC").to_iso8601_string(),
-            },
-        )
+    if not azure_ok and not postgres_ok:
+        raise RuntimeError(f"[{PIPELINE_NAME}] Year {year} — both Azure and Postgres load failed")
 
-        if missing_months:
-            logger.warning(f"[{PIPELINE_NAME}] Skipped (missing data): {missing_months}")
 
-        if not azure_ok and not postgres_ok:
-            raise RuntimeError(
-                f"[{PIPELINE_NAME}] Year {year} — both Azure and Postgres load failed"
-            )
-
-    if __name__ == "__main__":
-        monthly_to_yearly_aggregation()
+if __name__ == "__main__":
+    monthly_to_yearly_aggregation()
