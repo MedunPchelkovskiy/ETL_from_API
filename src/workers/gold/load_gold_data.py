@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.clients.datalake_client import fs_client
+from src.core.exceptions import MissingDataError
 from src.helpers.gold.load import update_last_processed_timestamp, upload_parquet_bytes
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
@@ -587,8 +588,8 @@ def load_gold_monthly_summ_data_to_postgres_worker(
             logger.exception("Failed to load monthly summ data for month number %s", month_number)
             raise
 
-def load_yearly_summ_data_to_azure_worker(yearly_agg_df):
 
+def load_yearly_summ_data_to_azure_worker(yearly_agg_df):
     year_str = str(yearly_agg_df["year_start"].iloc[0].year)
     file_name = f"{year_str}.parquet"
     # Convert to Parquet bytes
@@ -596,7 +597,7 @@ def load_yearly_summ_data_to_azure_worker(yearly_agg_df):
     yearly_agg_df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
     parquet_bytes = parquet_buffer.getvalue()
     upload_parquet_bytes(fs_client, config("BASE_DIR_YEARLY_SUMM_GOLD"),
-                        [year_str,file_name], parquet_bytes)
+                         [year_str, file_name], parquet_bytes)
 
 
 def load_gold_yearly_summ_data_to_postgres_worker(
@@ -667,10 +668,9 @@ def load_gold_yearly_summ_data_to_postgres_worker(
             inserted = result.rowcount or 0
             skipped = len(values) - inserted
 
-
         logger.info(
             "Done year %s | inserted=%s | skipped=%s | total_rows=%s",
-             year, inserted, skipped, len(values),
+            year, inserted, skipped, len(values),
         )
 
     except SQLAlchemyError:
@@ -678,14 +678,92 @@ def load_gold_yearly_summ_data_to_postgres_worker(
         raise
 
 
-
 def load_seasonal_summ_data_to_azure_worker(seasonal_agg_df):
-    year_str = str(seasonal_agg_df["year"])
-    period_type = str(seasonal_agg_df["period_type"])
+    year_str = str(seasonal_agg_df["year"].iloc[0])
+    period_type = str(seasonal_agg_df["period_type"].iloc[0])
     file_name = f"{period_type}_{year_str}.parquet"
     # Convert to Parquet bytes
     parquet_buffer = io.BytesIO()
     seasonal_agg_df.to_parquet(parquet_buffer, engine="pyarrow", compression="snappy")
     parquet_bytes = parquet_buffer.getvalue()
     upload_parquet_bytes(fs_client, config("BASE_DIR_SEASONALLY_SUMM_GOLD"),
-                        [year_str,file_name], parquet_bytes)
+                         [year_str, file_name], parquet_bytes)
+
+
+def load_gold_seasonally_summ_data_to_postgres_worker(
+        engine,
+        seasonally_agg_df: pd.DataFrame):
+    """
+    Loader for gold_yearly_summarized_data.
+    Expects pre-validated DataFrame from the monthly Gold layer.
+    Demonstrates batch INSERT with ON CONFLICT for portfolio scalability showcase.
+    """
+    logger = get_logger()
+
+    stmt = text("""
+        INSERT INTO gold_yearly_summarized_data (
+            place_name, generated_at,
+            period_type, period_start,
+            temp_max, temp_min, temp_avg,
+            rain_min, rain_max, rain_avg,
+            snow_min, snow_max, snow_avg,
+            wind_speed_min, wind_speed_max, wind_speed_avg,
+            cloud_cover_min, cloud_cover_max, cloud_cover_avg,
+            humidity_min, humidity_max, humidity_avg
+        ) VALUES (
+            :place_name, :generated_at,
+            :period_type, :period_start,
+            :temp_max, :temp_min, :temp_avg,
+            :rain_min, :rain_max, :rain_avg,
+            :snow_min, :snow_max, :snow_avg,
+            :wind_speed_min, :wind_speed_max, :wind_speed_avg,
+            :cloud_cover_min, :cloud_cover_max, :cloud_cover_avg,
+            :humidity_min, :humidity_max, :humidity_avg
+        )
+        ON CONFLICT (place_name, period_start, period_type) DO UPDATE SET
+        temp_max = EXCLUDED.temp_max,
+        temp_min = EXCLUDED.temp_min,
+        temp_avg = EXCLUDED.temp_avg,
+        rain_min = EXCLUDED.rain_min,
+        rain_max = EXCLUDED.rain_max,
+        rain_avg = EXCLUDED.rain_avg,
+        snow_min = EXCLUDED.snow_min,
+        snow_max = EXCLUDED.snow_max,
+        snow_avg = EXCLUDED.snow_avg,
+        wind_speed_min = EXCLUDED.wind_speed_min,
+        wind_speed_max = EXCLUDED.wind_speed_max,
+        wind_speed_avg = EXCLUDED.wind_speed_avg,
+        cloud_cover_min = EXCLUDED.cloud_cover_min, 
+        cloud_cover_max = EXCLUDED.cloud_cover_max, 
+        cloud_cover_avg = EXCLUDED.cloud_cover_avg,
+        humidity_min = EXCLUDED.humidity_min, 
+        humidity_max = EXCLUDED.humidity_max, 
+        humidity_avg = EXCLUDED.humidity_avg
+    """)
+
+    if seasonally_agg_df is None or seasonally_agg_df.empty:
+        logger.warning("Gold seasonally summ worker skip load: empty dataframe")
+
+    else:
+        year = seasonally_agg_df['period_start'].iloc[0]
+
+        logger.info(
+            "Loading year",
+            year, seasonally_agg_df.shape
+        )
+        values = seasonally_agg_df.to_dict("records")
+
+        try:
+            with engine.begin() as conn:
+                result = conn.execute(stmt, values)
+                inserted = result.rowcount or 0
+                skipped = len(values) - inserted
+
+            logger.info(
+                "Done year %s | inserted=%s | skipped=%s | total_rows=%s",
+                year, inserted, skipped, len(values),
+            )
+
+        except SQLAlchemyError:
+            logger.exception("Failed to load yearly summ data for year %s", year)
+            raise

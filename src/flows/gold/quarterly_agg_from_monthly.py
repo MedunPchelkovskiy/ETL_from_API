@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 
 from src.clients.datalake_client import fs_client
 from src.core.exceptions import DataIssueError
-from src.helpers.gold.extract import expected_months_map, critical_month_map, \
+from src.helpers.gold.extract import expected_months_map, \
     get_oldest_monthly_date_azure, get_oldest_monthly_date_postgres, group_months_by_season
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.find_process_state import get_pending_work
@@ -15,14 +15,15 @@ from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, P
 from src.helpers.observability_helpers.state_helpers import reconcile_processing_state, get_last_reconciled_date, \
     upsert_state_fn, get_current_retry_count
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
-from src.tasks.gold.load_gold_data import load_gold_seasonal_summ_data_to_azure
+from src.tasks.gold.load_gold_data import load_gold_seasonally_summ_data_to_azure, \
+    load_gold_seasonally_summ_data_to_postgres
 from src.tasks.gold.transform_gold_data import get_seasonally_summ_data
 
 PIPELINE_NAME = "gold_seasonal"  # TODO: Add season to build processing_level name in processing state table
 
 
 @flow(name="Aggregate monthly to seasonal flow")
-def monthly_to_quarterly_aggregation():
+def monthly_to_seasonally_aggregation():
     logger = get_logger()
     now = pendulum.now("UTC")
     engine = create_engine(config("DB_CONN_RAW"))
@@ -229,38 +230,71 @@ def monthly_to_quarterly_aggregation():
         season_data_aggregated[season_label] = season_summ
 
     # ── load ─────────────────────────────────────────────────
-
+    failed_seasons = []
     for season_label, df in season_data_aggregated.items():
+        season_name, season_year = season_label.split("_")
+        season_year = int(season_year)
+        expected = expected_months_map[season_name]
+        period_start_month = int(min(expected))
+        if season_name == "winter":
+            period_start = pendulum.datetime(season_year - 1, period_start_month, 1)
+        else:
+            period_start = pendulum.datetime(season_year, period_start_month, 1)
 
         azure_ok = False
         postgres_ok = False
         try:
-            load_gold_seasonal_summ_data_to_azure(PIPELINE_NAME, season_label, df)
+            load_gold_seasonally_summ_data_to_azure(PIPELINE_NAME, season_label, df)
             azure_ok = True
         except Exception:
             logger.exception(f"[{PIPELINE_NAME}] Azure upload failed for {season_label}")
 
         try:
-            load_gold_yearly_summ_data_to_postgres(PIPELINE_NAME, df, season_label)
+            load_gold_seasonally_summ_data_to_postgres(PIPELINE_NAME, df, season_label)
             postgres_ok = True
+
         except Exception:
-            logger.exception(f"[{PIPELINE_NAME}] Postgres load failed for {year}")
+            logger.exception(f"[{PIPELINE_NAME}] Postgres load failed for {season_label}")
 
         if azure_ok or postgres_ok:
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=pendulum.datetime(now.year, 1, 1),
+                partition_date=period_start,
                 status="success",
-                expected_count=expected_months,
-                actual_count=len(pending_months),
+                expected_count=len(expected),
+                actual_count=len(expected),
             )
         else:
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=pendulum.datetime(now.year, 1, 1),
+                partition_date=period_start,
                 status="failed",
-                expected_count=expected_months,
+                expected_count=len(expected),
                 actual_count=0,
                 error_type="missing_partitions",
                 error_message="Both Azure and Postgres load failed",
             )
+            failed_seasons.append(season_label)
+    # ── final report ──────────────────────────────────────────────────────────
+    logger.info(
+        f"[{PIPELINE_NAME}] Finished | "
+        f"processed={len(season_data_aggregated)} | "
+        f"missed={len(missing_months)} | "
+        f"failed={len(failed_seasons)}",
+        extra={
+            "flow_run_id": prefect.runtime.flow_run.id,
+            "utc_time": pendulum.now("UTC").to_iso8601_string(),
+        },
+    )
+
+    if missing_months:
+        logger.warning(f"[{PIPELINE_NAME}] Skipped missing data: {missing_months}")
+
+    if failed_seasons:
+        raise RuntimeError(
+            f"[{PIPELINE_NAME}] Both Azure and Postgres load failed for: {failed_seasons}"
+        )
+
+
+if __name__ == "__main__":
+    monthly_to_seasonally_aggregation()
