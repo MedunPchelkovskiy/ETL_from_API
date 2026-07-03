@@ -2,10 +2,11 @@ from prefect import flow, runtime
 from prefect.deployments import run_deployment
 
 from logging_config import setup_logging
+from pushgateway_utils import measure_flow_duration
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
-
 @flow(name="OrchestratorFlow")
+@measure_flow_duration(flow_name="orchestrator_flow")
 def orchestrator_flow():
     """
     Orchestrates two Prefect 3 deployments sequentially with structured logging.
