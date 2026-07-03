@@ -6,6 +6,7 @@ from prefect import flow
 from prefect.client import get_client
 
 from logging_config import setup_logging
+from pushgateway_utils import measure_flow_duration
 from src.clients.datalake_client import fs_client
 from src.helpers.bronze.api_location_mapper import api_locations
 from src.helpers.bronze.extract_tasks_mapper import api_tasks
@@ -21,6 +22,7 @@ from src.tasks.bronze.load_raw_weather_data_tasks import load_raw_api_data_to_az
     flow_run_name=lambda: f"extract_data_for_ski_resorts_in_Bulgaria - {pendulum.now("UTC").format("YYYY-MM-DD HH:mm:ss")}",
     # Lambda give dynamically timestamp on every flow execution
 )
+@measure_flow_duration(flow_name="bronze_flow")
 def weather_flow_run(debug: bool = False):
     now = pendulum.now("UTC")
     start_metrics_server()

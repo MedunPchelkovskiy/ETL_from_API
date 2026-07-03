@@ -3,6 +3,7 @@ import prefect
 from azure.core.exceptions import ResourceNotFoundError
 from prefect import flow
 
+from pushgateway_utils import measure_flow_duration
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.tasks.gold.extract_from_silver import get_silver_parquet_azure
 from src.tasks.gold.load_gold_data import load_gold_daily_data_to_azure, \
@@ -12,6 +13,7 @@ from src.tasks.gold.transform_silver_data import get_daily_forecast_data, get_fi
 
 @flow(
     name="daily_dataset_forecast", )
+@measure_flow_duration(flow_name="gold_daily_flow")
 def daily_forecast(forecast_day=None, max_hour=None):  # possibly can pass old date and hour to ingest data
     logger = get_logger()
     now = pendulum.now("UTC")

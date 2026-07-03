@@ -9,7 +9,7 @@ from prefect import flow
 
 from logging_config import setup_logging
 from metrics import FLOW_DURATION, PIPELINE_RUNNING
-from pushgateway_utils import push_metrics_to_gateway
+from pushgateway_utils import push_metrics_to_gateway, measure_flow_duration
 from src.clients.datalake_client import fs_client
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.tasks.silver.extract_from_bronze_layer_tasks import extract_bronze_data_from_postgres, \
@@ -22,6 +22,7 @@ from src.tasks.silver.transform_bronze_data_tasks import clean_silver, parse_api
     flow_run_name=lambda: f"Extract bronze data for transformation flow - {pendulum.now('UTC').format('DD-MM-YYYY-HH:mm:ss')}"
     # Lambda give dynamically timestamp on every flow execution
 )
+@measure_flow_duration(flow_name="silver_flow")
 def transform_bronze_data(date: Optional[str] = None,
                           hour: Optional[int] = None,
                           base_dir=config("BASE_DIR_RAW"),

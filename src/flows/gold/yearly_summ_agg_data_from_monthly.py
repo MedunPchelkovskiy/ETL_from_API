@@ -5,6 +5,7 @@ from prefect import flow
 from prefect.states import Completed
 from sqlalchemy import create_engine
 
+from pushgateway_utils import measure_flow_duration
 from src.clients.datalake_client import fs_client
 from src.core.exceptions import DataIssueError
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
@@ -20,6 +21,7 @@ PIPELINE_NAME = "gold_yearly"
 
 
 @flow(name="Aggregate monthly to yearly flow")
+@measure_flow_duration(flow_name="gold_monthly_to_yearly_flow")
 def monthly_to_yearly_aggregation():
     logger = get_logger()
     now = pendulum.now("UTC")

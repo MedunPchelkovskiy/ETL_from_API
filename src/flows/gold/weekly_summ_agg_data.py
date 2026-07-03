@@ -5,6 +5,7 @@ from prefect import flow
 from prefect.states import Completed
 from sqlalchemy import create_engine
 
+from pushgateway_utils import measure_flow_duration
 from src.clients.datalake_client import fs_client
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.find_process_state import get_pending_work
@@ -36,6 +37,7 @@ MAX_MISSING_DAYS = 3
 # ── flow ──────────────────────────────────────────────────────────────────────
 
 @flow(name="Aggregate daily to weekly flow")
+@measure_flow_duration(flow_name="gold_weekly_summ_flow")
 def daily_to_weekly_aggregation():
     logger = get_logger()
     now = pendulum.now("UTC")
