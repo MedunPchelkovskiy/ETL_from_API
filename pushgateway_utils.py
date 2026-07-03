@@ -86,3 +86,33 @@ def push_task_metrics(
 
     # Push metrics to Pushgateway
     push_to_gateway(pushgateway_url, job=f"{flow_name}_{task_name}", registry=registry)
+
+
+def push_api_metrics(
+        api_name: str,
+        location: str,
+        duration: float,
+        pushgateway_url: str = PUSHGATEWAY_URL
+):
+    """
+    Push call-level metrics to Prometheus Pushgateway.
+
+    Metrics pushed:
+      - API name
+      - Searched location
+      - Call execution duration
+
+    """
+    registry = CollectorRegistry()
+
+    # Task duration
+    call_duration = Histogram(
+        "api_call_duration_seconds",
+        "API call execution duration in seconds",
+        ["api_name", "location"],
+        registry=registry
+    )
+    call_duration.labels(api_name, location).observe(duration)
+
+    # Push metrics to Pushgateway
+    push_to_gateway(pushgateway_url, job="weather_pipeline", registry=registry)

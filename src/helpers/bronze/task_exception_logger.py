@@ -1,5 +1,8 @@
+import time
+
 from requests import RequestException
 
+from pushgateway_utils import push_api_metrics
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
@@ -7,6 +10,7 @@ def call_api_with_logging(api_func, *args, name=None, **kwargs):
     logger = get_logger()
     display_name = name or "unknown location"
     api_name = api_func.__name__
+    start_time = time.time()
 
     try:
         result = api_func(*args, **kwargs)
@@ -53,6 +57,17 @@ def call_api_with_logging(api_func, *args, name=None, **kwargs):
             }
         )
         raise RuntimeError(f"Non-retryable error for {display_name}")
+
+
+    finally:
+        duration = time.time() - start_time
+        logger.info(
+            "API duration | api=%s | target=%s | duration=%.3fs",
+            api_name,
+            display_name,
+            duration,
+        )
+        push_api_metrics(api_name=api_name, location=display_name, duration=duration)
 
     logger.info(
         "API call succeeded | api=%s | target=%s",
