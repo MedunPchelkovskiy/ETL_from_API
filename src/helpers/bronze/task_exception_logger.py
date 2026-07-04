@@ -2,7 +2,7 @@ import time
 
 from requests import RequestException
 
-from pushgateway_utils import push_api_metrics
+from src.helpers.observability_helpers.pushgateway_utils import push_api_metrics
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 

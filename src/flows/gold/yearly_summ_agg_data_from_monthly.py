@@ -5,7 +5,7 @@ from prefect import flow
 from prefect.states import Completed
 from sqlalchemy import create_engine
 
-from pushgateway_utils import measure_flow_duration
+from src.helpers.observability_helpers.decorators import measure_flow_duration
 from src.clients.datalake_client import fs_client
 from src.core.exceptions import DataIssueError
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger

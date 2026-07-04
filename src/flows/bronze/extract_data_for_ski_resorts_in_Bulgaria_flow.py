@@ -1,17 +1,14 @@
-from datetime import datetime
-
 import pendulum
 from decouple import config  # import configuration
 from prefect import flow
 from prefect.client import get_client
 
 from logging_config import setup_logging
-from pushgateway_utils import measure_flow_duration
+from src.helpers.observability_helpers.decorators import measure_flow_duration
 from src.clients.datalake_client import fs_client
 from src.helpers.bronze.api_location_mapper import api_locations
 from src.helpers.bronze.extract_tasks_mapper import api_tasks
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
-from src.helpers.observability_helpers.metrics_server import start_metrics_server
 from src.tasks.bronze.load_raw_weather_data_tasks import load_raw_api_data_to_azure_blob, \
     load_raw_api_data_to_postgres_local
 
@@ -25,7 +22,6 @@ from src.tasks.bronze.load_raw_weather_data_tasks import load_raw_api_data_to_az
 @measure_flow_duration(flow_name="bronze_flow")
 def weather_flow_run(debug: bool = False):
     now = pendulum.now("UTC")
-    start_metrics_server()
     date_str = now.format("YYYY-MM-DD")
     hour_str = now.format("HH")
     setup_logging()
@@ -61,7 +57,6 @@ def weather_flow_run(debug: bool = False):
 
 
 def main_flow():
-    start_metrics_server()
     weather_flow_run()
 
 

@@ -4,7 +4,7 @@ from azure.core.exceptions import ResourceNotFoundError
 from prefect import flow
 from prefect.states import Completed
 
-from pushgateway_utils import measure_flow_duration
+from src.helpers.observability_helpers.decorators import measure_flow_duration
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.tasks.gold.extract_from_gold import get_hourly_gold_azure, get_hourly_gold_postgres
 from src.tasks.gold.load_gold_data import load_gold_daily_summ_data_to_azure, load_gold_daily_summ_data_to_postgres

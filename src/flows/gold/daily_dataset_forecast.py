@@ -3,7 +3,7 @@ import prefect
 from azure.core.exceptions import ResourceNotFoundError
 from prefect import flow
 
-from pushgateway_utils import measure_flow_duration
+from src.helpers.observability_helpers.decorators import measure_flow_duration
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.tasks.gold.extract_from_silver import get_silver_parquet_azure
 from src.tasks.gold.load_gold_data import load_gold_daily_data_to_azure, \

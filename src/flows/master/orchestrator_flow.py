@@ -2,7 +2,7 @@ from prefect import flow, runtime
 from prefect.deployments import run_deployment
 
 from logging_config import setup_logging
-from pushgateway_utils import measure_flow_duration
+from src.helpers.observability_helpers.decorators import measure_flow_duration
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 @flow(name="OrchestratorFlow")
