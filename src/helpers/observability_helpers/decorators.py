@@ -1,10 +1,12 @@
 import time
+from functools import wraps
 
 from src.helpers.observability_helpers.pushgateway_utils import push_metrics_to_gateway
 
 
 def measure_flow_duration(flow_name: str):
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             start = time.time()
             status = "failed"
@@ -27,6 +29,7 @@ def measure_flow_duration(flow_name: str):
 
 def measure_task_duration(flow_name: str, task_name: str, on_complete):
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             start = time.time()
             status = "failed"

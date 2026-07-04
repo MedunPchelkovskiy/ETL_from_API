@@ -70,7 +70,7 @@ def extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, ho
     )
 
     task_duration = (pendulum.now('UTC') - task_start).total_seconds()
-    push_task_metrics(flow_name="Transform bronze data", task_name="Extract raw jsons from Azure", duration=(task_duration), rows=rows_count)
+    # push_task_metrics(flow_name="Transform bronze data", task_name="Extract raw jsons from Azure", duration=(task_duration), rows=rows_count)
     # TASK_DURATION.labels("Transform bronze data", "Extract raw jsons from Azure").observe(time.time() - start)
     # ROWS_PROCESSED.labels("Transform bronze data", "Extract raw jsons from Azure").inc(rows_count)
 
