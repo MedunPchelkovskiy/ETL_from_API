@@ -2,6 +2,8 @@ import pandas as pd
 from prefect import task
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.helpers.observability_helpers.decorators import measure_task_duration
+from src.helpers.observability_helpers.pushgateway_utils import push_task_metrics
 from src.workers.silver.transform_bronze_data import clean_silver_df, normalize_and_combine, parse_records_from_api
 
 
@@ -13,6 +15,7 @@ def normalize_combine_task(download_results):
 
 
 @task
+@measure_task_duration(flow_name="silver_flow", task_name="parse_api_records", on_complete=push_task_metrics)
 def parse_api_records(bronze_records: dict):
     """
     Prefect task that parses one API's group of bronze rows.
@@ -28,6 +31,7 @@ def parse_api_records(bronze_records: dict):
 
 
 @task
+@measure_task_duration(flow_name="silver_flow", task_name="clean_silver", on_complete=push_task_metrics)
 def clean_silver(df: pd.DataFrame):
     logger = get_logger()
     logger.info(

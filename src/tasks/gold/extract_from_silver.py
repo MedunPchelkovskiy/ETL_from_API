@@ -10,10 +10,13 @@ from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from src.clients.datalake_client import fs_client
 from src.helpers.gold.extract import get_last_processed_timestamp
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.helpers.observability_helpers.decorators import measure_task_duration
+from src.helpers.observability_helpers.pushgateway_utils import push_task_metrics
 from src.workers.gold.extract_silver_data import fetch_silver_parquet_blob, fetch_silver_data_postgres
 
 
 @task(name="Get silver data from Azure Parquet Incremental", retries=3, retry_delay_seconds=60)
+@measure_task_duration(flow_name="gold_daily_dataset_forecast", task_name="get_silver_parquet_azure", on_complete=push_task_metrics)
 def get_silver_parquet_azure(pipeline_name, forecast_day, max_hour):
     logger = get_logger()
     start_time = pendulum.now("UTC")
@@ -81,6 +84,7 @@ def get_silver_parquet_azure(pipeline_name, forecast_day, max_hour):
 
 
 @task(name="daily forecast")
+@measure_task_duration(flow_name="gold_daily_dataset_forecast", task_name="get_silver_data_postgres", on_complete=push_task_metrics)
 def get_silver_data_postgres(forecast_day, max_hour):
     logger = get_logger()
 

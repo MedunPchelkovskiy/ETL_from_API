@@ -9,11 +9,14 @@ from sqlalchemy.exc import SQLAlchemyError, DBAPIError, OperationalError
 from src.clients.datalake_client import fs_client
 from src.helpers.gold.extract import get_last_processed_timestamp
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.helpers.observability_helpers.decorators import measure_task_duration
+from src.helpers.observability_helpers.pushgateway_utils import push_task_metrics
 from src.workers.gold.extract_gold_data import get_hourly_blobs_for_day, get_hourly_data_postgres, \
     get_daily_blobs_for_week, get_daily_data_postgres, get_monthly_blob_for_year, get_monthly_record_for_year
 
 
 @task(name="Get hourly day data from azure")
+@measure_task_duration(flow_name="gold_daily_summ_flow", task_name="get_hourly_gold_azure", on_complete=push_task_metrics)
 def get_hourly_gold_azure(pipeline_name, forecast_day) -> list[tuple[pendulum.DateTime, pd.DataFrame]]:
     logger = get_logger()
     logger.info("Start task get hourly day data from azure")
@@ -74,6 +77,7 @@ def get_hourly_gold_azure(pipeline_name, forecast_day) -> list[tuple[pendulum.Da
 
 
 @task(name="daily forecast")
+@measure_task_duration(flow_name="gold_daily_summ_flow", task_name="get_hourly_gold_postgres", on_complete=push_task_metrics)
 def get_hourly_gold_postgres(pipeline_name, forecast_day):
     logger = get_logger()
 
@@ -138,6 +142,7 @@ def get_hourly_gold_postgres(pipeline_name, forecast_day):
 
 
 @task(name="get daily summ gold blobs", retries=3, retry_delay_seconds=60)
+@measure_task_duration(flow_name="gold_flow", task_name="get_daily_gold_azure", on_complete=push_task_metrics)
 def get_daily_gold_azure(week_dates: list[pendulum.DateTime],
                          ) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
     logger = get_logger()
@@ -176,6 +181,7 @@ def get_daily_gold_azure(week_dates: list[pendulum.DateTime],
 
 
 @task(name="get daily summ gold postgres")
+@measure_task_duration(flow_name="gold_flow", task_name="get_daily_gold_postgres", on_complete=push_task_metrics)
 def get_daily_gold_postgres(week_dates: list[pendulum.DateTime],
                             ) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
     logger = get_logger()
@@ -221,6 +227,7 @@ def get_daily_gold_postgres(week_dates: list[pendulum.DateTime],
 #     return get_daily_data_postgres(week_dates, engine)
 
 @task(name="get monthly summ gold blobs", retries=3, retry_delay_seconds=60)
+@measure_task_duration(flow_name="gold_flow", task_name="get_monthly_gold_azure", on_complete=push_task_metrics)
 def get_monthly_gold_azure(month: pendulum.DateTime,
                          ) -> pd.DataFrame:
     logger = get_logger()
@@ -242,6 +249,7 @@ def get_monthly_gold_azure(month: pendulum.DateTime,
     return month_df
 
 @task(name="get monthly summ gold postgres", retries=3, retry_delay_seconds=60)
+@measure_task_duration(flow_name="gold_flow", task_name="get_monthly_gold_postgres", on_complete=push_task_metrics)
 def get_monthly_gold_postgres(month: pendulum.DateTime,) -> pd.DataFrame:
     logger = get_logger()
     start_time = pendulum.now("UTC")

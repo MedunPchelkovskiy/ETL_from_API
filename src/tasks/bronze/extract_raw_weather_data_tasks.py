@@ -1,6 +1,8 @@
 from prefect import task
 from prefect.context import get_run_context
 
+from src.helpers.observability_helpers.decorators import measure_task_duration
+from src.helpers.observability_helpers.pushgateway_utils import push_task_metrics
 from src.workers.bronze.extract_data_from_weather_APIs_workers import extract_data_from_foreca_api, \
     extract_data_from_accuweather_api, \
     get_from_meteoblue_api, extract_data_from_tomorrow_api, \
@@ -12,7 +14,9 @@ from src.helpers.bronze.task_exception_logger import call_api_with_logging
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 
 
-@task(retries=3, retry_delay_seconds=20, )           #add caching to prevent expensive API calls: cache_key_fn=task_input_hash, cache_expiration=timedelta(hours=1),
+@task(retries=3,
+      retry_delay_seconds=20, )  # add caching to prevent expensive API calls: cache_key_fn=task_input_hash, cache_expiration=timedelta(hours=1),
+@measure_task_duration(flow_name="bronze_flow", task_name="get_foreca_data", on_complete=push_task_metrics)
 def get_foreca_data(place_name: str):
     logger = get_logger()
     api = "foreca_api"
@@ -36,6 +40,7 @@ def get_foreca_data(place_name: str):
 
 
 @task(retries=3, retry_delay_seconds=20, )
+@measure_task_duration(flow_name="bronze_flow", task_name="get_accuweather_data", on_complete=push_task_metrics)
 def get_accuweather_data(place_name: str):
     api = "accuweather_api"
     logger = get_logger()
@@ -59,6 +64,7 @@ def get_accuweather_data(place_name: str):
 
 
 @task(retries=3, retry_delay_seconds=20, )
+@measure_task_duration(flow_name="bronze_flow", task_name="get_meteoblue_data", on_complete=push_task_metrics)
 def get_meteoblue_data(place_name: str, country: str):
     api = "meteoblue_api"
     logger = get_logger()
@@ -91,6 +97,7 @@ def get_meteoblue_data(place_name: str, country: str):
 
 
 @task(retries=3, retry_delay_seconds=20, )
+@measure_task_duration(flow_name="bronze_flow", task_name="get_tomorrow_data", on_complete=push_task_metrics)
 def get_tomorrow_data(place_name: str):
     api = "tomorrow_api"
     logger = get_logger()
@@ -114,6 +121,7 @@ def get_tomorrow_data(place_name: str):
 
 
 @task(retries=3, retry_delay_seconds=20, )
+@measure_task_duration(flow_name="bronze_flow", task_name="get_openweathermap_data", on_complete=push_task_metrics)
 def get_openweathermap_data(place_name: str, iso_country_code: str):
     api = "openweathermap_api"
     logger = get_logger()
@@ -136,6 +144,7 @@ def get_openweathermap_data(place_name: str, iso_country_code: str):
 
 
 @task(retries=3, retry_delay_seconds=20, )
+@measure_task_duration(flow_name="bronze_flow", task_name="get_weatherapi_data", on_complete=push_task_metrics)
 def get_weatherapi_data(lat, lon):
     api = "weatherapi_api"
     logger = get_logger()
@@ -159,6 +168,7 @@ def get_weatherapi_data(lat, lon):
 
 
 @task(retries=3, retry_delay_seconds=20, )
+@measure_task_duration(flow_name="bronze_flow", task_name="get_open_meteo_data", on_complete=push_task_metrics)
 def get_open_meteo_data(lat, lon):
     api = "open_meteo_api"
     logger = get_logger()

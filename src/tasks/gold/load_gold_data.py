@@ -6,6 +6,8 @@ from prefect import task
 from sqlalchemy import create_engine
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.helpers.observability_helpers.decorators import measure_task_duration
+from src.helpers.observability_helpers.pushgateway_utils import push_task_metrics
 from src.workers.gold.load_gold_data import load_gold_data_to_azure_worker, load_gold_daily_data_to_postgres_worker, \
     load_five_day_data_to_postgres_worker, load_gold_five_day_data_to_azure_worker, \
     load_daily_summ_data_to_azure_worker, load_gold_daily_summ_data_to_postgres_worker, \
@@ -16,6 +18,7 @@ from src.workers.gold.load_gold_data import load_gold_data_to_azure_worker, load
 
 
 @task(name="Load gold daily data to Azure blob", retries=3, retry_delay_seconds=300)
+@measure_task_duration(flow_name="gold_daily_dataset_forecast", task_name="load_gold_daily_data_to_azure", on_complete=push_task_metrics)
 def load_gold_daily_data_to_azure(pipeline_name, gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold data to Azure",
@@ -34,6 +37,7 @@ def load_gold_daily_data_to_azure(pipeline_name, gold_result: list):
 
 
 @task(retries=3, retry_delay_seconds=300)
+@measure_task_duration(flow_name="gold_daily_dataset_forecast", task_name="load_gold_daily_data_to_postgres", on_complete=push_task_metrics)
 def load_gold_daily_data_to_postgres(gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold daily data to Postgres local",
@@ -51,6 +55,7 @@ def load_gold_daily_data_to_postgres(gold_result: list):
 
 
 @task(name="Load five day gold data to Azure blob", retries=3, retry_delay_seconds=300)
+@measure_task_duration(flow_name="gold_daily_dataset_forecast", task_name="load_gold_five_day_data_to_azure", on_complete=push_task_metrics)
 def load_gold_five_day_data_to_azure(pipeline_name, gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold five day data to Azure",
@@ -69,6 +74,7 @@ def load_gold_five_day_data_to_azure(pipeline_name, gold_result: list):
 
 
 @task(retries=3, retry_delay_seconds=300)
+@measure_task_duration(flow_name="gold_daily_dataset_forecast", task_name="load_gold_five_day_data_to_postgres", on_complete=push_task_metrics)
 def load_gold_five_day_data_to_postgres(fd_gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold five day data to Postgres local",
@@ -86,6 +92,7 @@ def load_gold_five_day_data_to_postgres(fd_gold_result: list):
 
 
 @task(name="Load gold daily summarized data to Azure blob", retries=3, retry_delay_seconds=300)
+@measure_task_duration(flow_name="gold_daily_summ_flow", task_name="load_gold_daily_summ_data_to_azure", on_complete=push_task_metrics)
 def load_gold_daily_summ_data_to_azure(pipeline_name, gold_result: list):
     logger = get_logger()
     logger.info("Start task loading gold data to Azure",
@@ -104,6 +111,7 @@ def load_gold_daily_summ_data_to_azure(pipeline_name, gold_result: list):
 
 
 @task(retries=3, retry_delay_seconds=300)
+@measure_task_duration(flow_name="gold_daily_summ_flow", task_name="load_gold_daily_summ_data_to_postgres", on_complete=push_task_metrics)
 def load_gold_daily_summ_data_to_postgres(gold_result: list[tuple[pendulum.DateTime, pd.DataFrame]]):
     logger = get_logger()
     logger.info("Start task loading gold daily summarized data to Postgres local",
@@ -121,6 +129,7 @@ def load_gold_daily_summ_data_to_postgres(gold_result: list[tuple[pendulum.DateT
 
 
 @task(name="Load gold weekly summarized data to Azure blob", retries=3, retry_delay_seconds=30)
+@measure_task_duration(flow_name="gold_weekly_summ_flow", task_name="load_gold_weekly_summ_data_to_azure", on_complete=push_task_metrics)
 def load_gold_weekly_summ_data_to_azure(pipeline_name, week: pd.DataFrame):
     logger = get_logger()
     logger.info("Start task loading gold weekly data to Azure",
@@ -138,6 +147,7 @@ def load_gold_weekly_summ_data_to_azure(pipeline_name, week: pd.DataFrame):
 
 
 @task(name="Load gold weekly summarized data to postgres", retries=3, retry_delay_seconds=60)
+@measure_task_duration(flow_name="gold_weekly_summ_flow", task_name="load_gold_weekly_summ_data_to_postgres", on_complete=push_task_metrics)
 def load_gold_weekly_summ_data_to_postgres(pipeline_name, all_weeks_summ: list[pd.DataFrame]):
     logger = get_logger()
     logger.info("Start task loading gold weekly data to Postgres local",
@@ -157,6 +167,7 @@ def load_gold_weekly_summ_data_to_postgres(pipeline_name, all_weeks_summ: list[p
 
 @task(name="Load gold monthly summarized data to Azure blob", retries=3, retry_delay_seconds=30,
       task_run_name="Load monthly Azure | {pipeline_name} | {month_start}")
+@measure_task_duration(flow_name="gold_monthly_summ_flow", task_name="load_gold_monthly_summ_data_to_azure", on_complete=push_task_metrics)
 def load_gold_monthly_summ_data_to_azure(pipeline_name, month_start, month: pd.DataFrame):
     logger = get_logger()
     logger.info("Start task loading gold monthly data to Azure",
@@ -175,6 +186,7 @@ def load_gold_monthly_summ_data_to_azure(pipeline_name, month_start, month: pd.D
 
 @task(name="Load gold monthly summarized data to postgres", retries=3, retry_delay_seconds=60,
       task_run_name="Load monthly Postgres | {pipeline_name} | {month_start}")
+@measure_task_duration(flow_name="gold_monthly_summ_flow", task_name="load_gold_monthly_summ_data_to_postgres", on_complete=push_task_metrics)
 def load_gold_monthly_summ_data_to_postgres(pipeline_name, month_start, all_months_summ: list[pd.DataFrame]):
     logger = get_logger()
     logger.info("Start task loading gold monthly data to Postgres local",
@@ -196,6 +208,7 @@ def load_gold_monthly_summ_data_to_postgres(pipeline_name, month_start, all_mont
     name="Load gold yearly summarized data to Azure", retries=3, retry_delay_seconds=30,
     task_run_name="Load yearly Azure | {pipeline_name} | {year}"
 )
+@measure_task_duration(flow_name="gold_monthly_to_yearly_flow", task_name="load_gold_yearly_summ_data_to_azure", on_complete=push_task_metrics)
 def load_gold_yearly_summ_data_to_azure(PIPELINE_NAME, yearly_summ, year):
     logger = get_logger()
     logger.info("Start task loading gold yearly data to Azure",
@@ -212,6 +225,7 @@ def load_gold_yearly_summ_data_to_azure(PIPELINE_NAME, yearly_summ, year):
 
 @task(name="Load gold yearly summarized data to postgres", retries=3, retry_delay_seconds=60,
       task_run_name="Load yearly Postgres | {pipeline_name} | {year}")
+@measure_task_duration(flow_name="gold_monthly_to_yearly_flow", task_name="load_gold_yearly_summ_data_to_postgres", on_complete=push_task_metrics)
 def load_gold_yearly_summ_data_to_postgres(PIPELINE_NAME, yearly_summ: pd.DataFrame, year):
     logger = get_logger()
     logger.info("Start task loading gold yearly data to Postgres local",
@@ -233,6 +247,7 @@ def load_gold_yearly_summ_data_to_postgres(PIPELINE_NAME, yearly_summ: pd.DataFr
     name="Load gold seasonally summarized data to Azure", retries=3, retry_delay_seconds=30,
     task_run_name="Load seasonally to Azure | {pipeline_name} | {season_label}"
 )
+@measure_task_duration(flow_name="gold_seasonal_flow", task_name="load_gold_seasonally_summ_data_to_azure", on_complete=push_task_metrics)
 def load_gold_seasonally_summ_data_to_azure(PIPELINE_NAME, season_label, df):
     logger = get_logger()
     logger.info("Start task loading gold seasonally data to Azure",
@@ -249,6 +264,7 @@ def load_gold_seasonally_summ_data_to_azure(PIPELINE_NAME, season_label, df):
 
 @task(name="Load gold seasonally summarized data to postgres", retries=3, retry_delay_seconds=60,
       task_run_name="Load gold seasonally Postgres | {pipeline_name} | {season_label}")
+@measure_task_duration(flow_name="gold_seasonal_flow", task_name="load_gold_seasonally_summ_data_to_postgres", on_complete=push_task_metrics)
 def load_gold_seasonally_summ_data_to_postgres(PIPELINE_NAME, df, season_label):
     logger = get_logger()
     logger.info("Start task loading gold seasonally data to Postgres local",

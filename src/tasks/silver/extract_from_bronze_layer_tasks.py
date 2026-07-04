@@ -3,6 +3,7 @@ from decouple import config
 from prefect import task, runtime
 from sqlalchemy import create_engine
 
+from src.helpers.observability_helpers.decorators import measure_task_duration
 from src.helpers.observability_helpers.pushgateway_utils import push_task_metrics
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.workers.silver.extract_bronze_data_for_transformation import extract_bronze_data_from_postgres_worker, \
@@ -10,6 +11,7 @@ from src.workers.silver.extract_bronze_data_for_transformation import extract_br
 
 
 @task
+@measure_task_duration(flow_name="silver_flow", task_name="get_bronze_from_azure", on_complete=push_task_metrics)
 def extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, hour):
     logger = get_logger()
     task_start = pendulum.now("UTC")
@@ -76,6 +78,7 @@ def extract_bronze_data_from_azure_blob_task(azure_fs_client, base_dir, date, ho
 
 
 @task(retries=3, retry_delay_seconds=7)
+@measure_task_duration(flow_name="silver_flow", task_name="get_bronze_from_postgres", on_complete=push_task_metrics)
 def extract_bronze_data_from_postgres(date, hour):
     """
     Prefect task to extract raw JSON rows from Postgres.

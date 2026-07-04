@@ -53,7 +53,6 @@ def push_task_metrics(
         flow_name: str,
         task_name: str,
         duration: float,
-        rows: int = 0,
         pushgateway_url: str = PUSHGATEWAY_URL
 ):
     """
@@ -75,13 +74,13 @@ def push_task_metrics(
     task_duration.labels(flow_name, task_name).observe(duration)
 
     # Rows processed
-    rows_processed = Counter(
-        "etl_rows_processed_total",
-        "Number of rows processed per task",
-        ["flow_name", "task_name"],
-        registry=registry
-    )
-    rows_processed.labels(flow_name, task_name).inc(rows)
+    # rows_processed = Counter(
+    #     "etl_rows_processed_total",
+    #     "Number of rows processed per task",
+    #     ["flow_name", "task_name"],
+    #     registry=registry
+    # )
+    # rows_processed.labels(flow_name, task_name).inc(rows)
 
     # Push metrics to Pushgateway
     push_to_gateway(pushgateway_url, job=f"{flow_name}_{task_name}", registry=registry)

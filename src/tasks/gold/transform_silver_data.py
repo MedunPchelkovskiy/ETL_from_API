@@ -2,10 +2,13 @@ import pendulum
 from prefect import task
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.helpers.observability_helpers.decorators import measure_task_duration
+from src.helpers.observability_helpers.pushgateway_utils import push_task_metrics
 from src.workers.gold.transform_silver_data import get_df_data, get_fdf_data
 
 
 @task(name="Transform silver data to daily")
+@measure_task_duration(flow_name="gold_daily_dataset_forecast", task_name="get_daily_forecast_data", on_complete=push_task_metrics)
 def get_daily_forecast_data(silver_results: list,
                             generated_at: pendulum.DateTime
                             ):
@@ -20,6 +23,7 @@ def get_daily_forecast_data(silver_results: list,
 
 
 @task(name="Transform silver data to five days")
+@measure_task_duration(flow_name="gold_daily_dataset_forecast", task_name="get_five_day_forecast_data", on_complete=push_task_metrics)
 def get_five_day_forecast_data(silver_results: list,
                                generated_at: pendulum.DateTime
                                ):
