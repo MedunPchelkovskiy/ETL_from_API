@@ -116,3 +116,50 @@ def push_api_metrics(
     push_to_gateway(pushgateway_url, job="weather_pipeline", registry=registry)
 
 
+def push_processing_state_metrics(
+        flow_name: str,
+        rows: list[dict],
+        pushgateway_url: str = PUSHGATEWAY_URL
+):
+    registry = CollectorRegistry()
+
+    completeness = Gauge(
+        "etl_completeness_ratio",
+        "Completeness ratio по processing_level",
+        ["flow_name", "processing_level", "status"],
+        registry=registry
+    )
+    retries = Gauge(
+        "etl_retry_count",
+        "Retry count по processing_level",
+        ["flow_name", "processing_level", "status"],
+        registry=registry
+    )
+    acceptable = Gauge(
+        "etl_is_acceptable",
+        "Дали последният partition е приемлив (1=да, 0=не)",
+        ["flow_name", "processing_level"],
+        registry=registry
+    )
+    errors = Counter(
+        "etl_processing_errors_total",
+        "Брой грешки по тип",
+        ["flow_name", "processing_level", "error_type"],
+        registry=registry
+    )
+
+    for row in rows:
+        level = row["processing_level"]
+        status = row["status"]
+
+        if row["completeness_ratio"] is not None:
+            completeness.labels(flow_name, level, status).set(row["completeness_ratio"])
+
+        retries.labels(flow_name, level, status).set(row["retry_count"])
+
+        acceptable.labels(flow_name, level).set(1 if row["is_acceptable"] else 0)
+
+        if row["error_type"]:
+            errors.labels(flow_name, level, row["error_type"]).inc()
+
+    push_to_gateway(pushgateway_url, job=f"{flow_name}_processing_state", registry=registry)
