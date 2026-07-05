@@ -69,7 +69,7 @@ PIPELINE_CONFIG = {
         "postgres_date_col": "year_start",
         "max_retries": 3,
         },
-    "gold_yearly_seasonal": {
+    "gold_seasonal": {
         "grain": "month",
         "max_missing_ratio": 0.33,
         "expected_count": 3,
@@ -89,7 +89,7 @@ PIPELINE_STATUS_MAP = {
     "gold_weekly": ["pending", "failed", "partial"],
     "gold_monthly": ["pending", "failed", "partial"],
     "gold_yearly": ["pending", "failed", "partial"],
-    "gold_yearly_Q": ["pending", "failed", "partial"],
+    "gold_seasonal": ["pending", "failed", "partial"],
 }
 
 PIPELINE_ERROR_MAP = {
@@ -100,5 +100,5 @@ PIPELINE_ERROR_MAP = {
     "gold_weekly": ["insufficient_data", "missing_partitions", None],
     "gold_monthly": ["insufficient_data", "missing_partitions", None],
     "gold_yearly": ["insufficient_data", "missing_partitions", None],
-    "gold_yearly_Q": ["insufficient_data", "missing_partitions", None],
+    "gold_seasonal": ["insufficient_data", "missing_partitions", None],
 }

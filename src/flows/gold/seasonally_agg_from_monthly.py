@@ -37,7 +37,9 @@ def monthly_to_seasonally_aggregation():
         someone changing the deployment schedule accidentally, CI/CD redeployments with immediate execution
     """
 
-    if now.month not in [3, 6, 9, 12]:
+    last_reconciled = get_last_reconciled_date(PIPELINE_NAME)
+
+    if last_reconciled is not None and now.month not in [3, 6, 9, 12]:
         logger.info("Not a season start month — skipping")
         return Completed(message="Skipped-NonSeasonal")
 
@@ -50,8 +52,6 @@ def monthly_to_seasonally_aggregation():
     )
     end_date = now.start_of("month")  # текущият месец excluded
     max_missing = 0
-
-    last_reconciled = get_last_reconciled_date(PIPELINE_NAME)
 
     if last_reconciled is None:
         try:

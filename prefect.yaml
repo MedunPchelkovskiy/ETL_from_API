@@ -78,4 +78,15 @@ deployments:
       name: local-dev-process
 
 
+  - name: gold-seasonal-summ-flow
+    description: Local Prefect deployment for gold seasonally summarized weather data flow
+    entrypoint: src/flows/gold/seasonally_agg_from_monthly.py:monthly_to_seasonally_aggregation
+    schedule:
+      cron: "9 0 1 3,6,9,12 *"
+      timezone: UTC
+    tags: [ local, portfolio ]
+    work_pool:
+      name: local-dev-process
+
+
 
