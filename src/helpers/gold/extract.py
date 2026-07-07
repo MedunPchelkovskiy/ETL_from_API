@@ -74,7 +74,9 @@ def group_months_by_season(
 
 
 def get_oldest_monthly_date_azure(fs_client, base_dir):
-    all_paths = sorted([str(p) for p in fs_client.ls(base_dir, detail=False)])
+    # all_paths = sorted([str(p) for p in fs_client.ls(base_dir, detail=False)])
+    paths = fs_client.get_paths(path=base_dir)
+    all_paths = sorted([p.name for p in paths])
     oldest_month = all_paths[0]
     parts = oldest_month.split("/")
     year = int(parts[-2])

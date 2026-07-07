@@ -248,13 +248,13 @@ def load_gold_yearly_summ_data_to_postgres(PIPELINE_NAME, yearly_summ: pd.DataFr
     task_run_name="Load seasonally to Azure | {pipeline_name} | {season_label}"
 )
 @measure_task_duration(flow_name="gold_seasonal_flow", task_name="load_gold_seasonally_summ_data_to_azure", on_complete=push_task_metrics)
-def load_gold_seasonally_summ_data_to_azure(PIPELINE_NAME, season_label, df):
+def load_gold_seasonally_summ_data_to_azure(pipeline_name, season_label, df):
     logger = get_logger()
     logger.info("Start task loading gold seasonally data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,
                        "task_run_id": runtime.task_run.id, })
 
-    load_seasonal_summ_data_to_azure_worker(df, season_label)
+    load_seasonal_summ_data_to_azure_worker(df)
 
     logger.info("Completed task loading gold seasonally data to Azure",
                 extra={"flow_run_id": runtime.flow_run.id,
@@ -265,7 +265,7 @@ def load_gold_seasonally_summ_data_to_azure(PIPELINE_NAME, season_label, df):
 @task(name="Load gold seasonally summarized data to postgres", retries=3, retry_delay_seconds=60,
       task_run_name="Load gold seasonally Postgres | {pipeline_name} | {season_label}")
 @measure_task_duration(flow_name="gold_seasonal_flow", task_name="load_gold_seasonally_summ_data_to_postgres", on_complete=push_task_metrics)
-def load_gold_seasonally_summ_data_to_postgres(PIPELINE_NAME, df, season_label):
+def load_gold_seasonally_summ_data_to_postgres(pipeline_name, df, season_label):
     logger = get_logger()
     logger.info("Start task loading gold seasonally data to Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,

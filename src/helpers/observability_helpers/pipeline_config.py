@@ -75,8 +75,8 @@ PIPELINE_CONFIG = {
         "expected_count": 3,
         "source_check": "azure+postgres",
         "azure_path_env": "BASE_DIR_YEARLY_SUMM_GOLD",  # Q(1, 2, 3, 4).parquet
-        "postgres_table": "gold_yearly_summarized_data",
-        "postgres_date_col": "year_start",
+        "postgres_table": "gold_seasonally_summarized_data",
+        "postgres_date_col": "period_start",
         "max_retries": 3,
     },
 }

@@ -109,6 +109,7 @@ def monthly_to_seasonally_aggregation():
         upsert_state_fn(
             processing_level=PIPELINE_NAME,
             partition_date=season_months[0],
+            period_name=season_label,
             status="processing",
             expected_count=len(expected),
         )
@@ -181,16 +182,26 @@ def monthly_to_seasonally_aggregation():
                     f"{len(total_missing)}/{len(expected)} missing months "
                     f"| retry {current_retries + 1}/{cfg['max_retries']}"
                 )
-
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
                 partition_date=period_start_month,
+                period_name=season_label,
                 status=status,
                 expected_count=len(expected),
                 actual_count=len(season_months),
                 error_type="missing_partitions",
                 error_message=error_message,
             )
+
+            # upsert_state_fn(
+            #     processing_level=PIPELINE_NAME,
+            #     partition_date=period_start_month,
+            #     status=status,
+            #     expected_count=len(expected),
+            #     actual_count=len(season_months),
+            #     error_type="missing_partitions",
+            #     error_message=error_message,
+            # )
 
             continue
 
@@ -205,9 +216,18 @@ def monthly_to_seasonally_aggregation():
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
                 partition_date=period_start_month,
+                period_name=season_label,
                 status="success",
-                expected_count=len(expected_months_map[season]),
+                expected_count=len(expected),
+                actual_count=len(expected),
             )
+
+            # upsert_state_fn(
+            #     processing_level=PIPELINE_NAME,
+            #     partition_date=period_start_month,
+            #     status="success",
+            #     expected_count=len(expected_months_map[season]),
+            # )
 
         except DataIssueError as e:
             # data / business issue
@@ -262,6 +282,7 @@ def monthly_to_seasonally_aggregation():
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
                 partition_date=period_start,
+                period_name=season_label,
                 status="success",
                 expected_count=len(expected),
                 actual_count=len(expected),
@@ -270,6 +291,7 @@ def monthly_to_seasonally_aggregation():
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
                 partition_date=period_start,
+                period_name=season_label,
                 status="failed",
                 expected_count=len(expected),
                 actual_count=0,

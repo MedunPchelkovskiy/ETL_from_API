@@ -151,7 +151,7 @@ def upsert_state_fn(
             %s, %s, %s, %s, %s, %s,
             %s, %s, NOW(), %s, %s
         )
-        ON CONFLICT (processing_level, partition_date) DO UPDATE SET
+        ON CONFLICT (processing_level, partition_date, (COALESCE(period_name, ''))) DO UPDATE SET
             period_name        = EXCLUDED.period_name,
             status             = EXCLUDED.status,
             expected_count     = EXCLUDED.expected_count,
