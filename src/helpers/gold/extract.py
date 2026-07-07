@@ -73,10 +73,27 @@ def group_months_by_season(
     return result
 
 
+# def get_oldest_monthly_date_azure(fs_client, base_dir):
+#     # all_paths = sorted([str(p) for p in fs_client.ls(base_dir, detail=False)])
+#     paths = fs_client.get_paths(path=base_dir)
+#     all_paths = sorted([p.name for p in paths])
+#     oldest_month = all_paths[0]
+#     parts = oldest_month.split("/")
+#     year = int(parts[-2])
+#     month = int(parts[-1].replace(".parquet", ""))
+#
+#     return year, month
+
+
 def get_oldest_monthly_date_azure(fs_client, base_dir):
-    # all_paths = sorted([str(p) for p in fs_client.ls(base_dir, detail=False)])
     paths = fs_client.get_paths(path=base_dir)
-    all_paths = sorted([p.name for p in paths])
+    all_paths = sorted([
+        p.name for p in paths
+        if p.name.endswith(".parquet")
+    ])
+    if not all_paths:
+        raise ValueError(f"No parquet files found under {base_dir}")
+
     oldest_month = all_paths[0]
     parts = oldest_month.split("/")
     year = int(parts[-2])
