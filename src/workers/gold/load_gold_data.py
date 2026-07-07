@@ -749,7 +749,7 @@ def load_gold_seasonally_summ_data_to_postgres_worker(
         year = seasonally_agg_df['period_start'].iloc[0]
 
         logger.info(
-            "Loading year",
+            "Loading year %s | shape =%s",
             year, seasonally_agg_df.shape
         )
         values = seasonally_agg_df.to_dict("records")
