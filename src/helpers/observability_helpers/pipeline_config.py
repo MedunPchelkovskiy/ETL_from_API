@@ -74,11 +74,21 @@ PIPELINE_CONFIG = {
         "max_missing_ratio": 0.33,
         "expected_count": 3,
         "source_check": "azure+postgres",
-        "azure_path_env": "BASE_DIR_YEARLY_SUMM_GOLD",  # Q(1, 2, 3, 4).parquet
-        "postgres_table": "gold_seasonally_summarized_data",
-        "postgres_date_col": "period_start",
+        "azure_path_env": "BASE_DIR_MONTHLY_SUMM_GOLD",      # месечен INPUT, не seasonal output
+        "postgres_table": "gold_monthly_summarized_data",     # месечен INPUT
+        "postgres_date_col": "month_start",                   # колоната в месечната таблица
         "max_retries": 3,
     },
+    # "gold_seasonal": {
+    #     "grain": "month",
+    #     "max_missing_ratio": 0.33,
+    #     "expected_count": 3,
+    #     "source_check": "azure+postgres",
+    #     "azure_path_env": "BASE_DIR_YEARLY_SUMM_GOLD",  # Q(1, 2, 3, 4).parquet
+    #     "postgres_table": "gold_seasonally_summarized_data",
+    #     "postgres_date_col": "period_start",
+    #     "max_retries": 3,
+    # },
 }
 
 PIPELINE_STATUS_MAP = {

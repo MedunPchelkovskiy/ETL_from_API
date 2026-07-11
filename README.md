@@ -101,3 +101,25 @@ prefect.yaml        Deployment and schedule configuration
 
 Core pipeline is stable and running on schedule. Grafana dashboards 
 and expanded test coverage are in active development.
+
+## Related Projects
+
+This pipeline's Gold-layer output (aggregated Parquet files in Azure
+Data Lake) is consumed by a companion REST API, which exposes the
+processed weather data over HTTP for downstream applications and
+dashboards.
+
+- **[ResortsWeatherAPI](https://github.com/MedunPchelkovskiy/ResortsWeatherAPI)**
+  — Read-only FastAPI service that reads Parquet files directly from
+  Azure Data Lake and serves aggregated weather data (daily, weekly,
+  monthly, seasonal, forecast) via REST endpoints. Provisioned with
+  Terraform and deployed via GitHub Actions to Azure Container Apps.
+
+  - Live API: https://resort-weather-api.happyglacier-4d64012d.polandcentral.azurecontainerapps.io/resorts
+  - Example endpoint: [`/resorts/Bansko/fivedaysforecast/live`](https://resort-weather-api.happyglacier-4d64012d.polandcentral.azurecontainerapps.io/resorts/Bansko/fivedaysforecast/live)
+
+  > Note: the app runs on a consumption-tier Azure Container App, so the
+  > first request after inactivity may take a few seconds to spin up.
+
+Together, the two projects form a complete pipeline: ingest → store →
+transform → serve.
