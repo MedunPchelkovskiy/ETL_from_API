@@ -112,3 +112,10 @@ PIPELINE_ERROR_MAP = {
     "gold_yearly": ["insufficient_data", "missing_partitions", None],
     "gold_seasonal": ["insufficient_data", "missing_partitions", None],
 }
+
+GRAIN_LABEL_MAP = {
+    "day": lambda d: f"day_{d.day_of_year}_{d.year}",          # "day_193-2026"
+    "week": lambda d: f"week_{d.isocalendar()[1]}_{d.year}",  # week_28_2026
+    "month": lambda d: f"{d.format('MMMM').lower()}_{d.year}",  # "july_2026"
+    "season": lambda d: f"{QUARTER_START_MONTH[d.month]}_{d.year + 1 if QUARTER_START_MONTH[d.month] == 'winter' else d.year}",  # summer_2026
+}

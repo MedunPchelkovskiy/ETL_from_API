@@ -5,11 +5,12 @@ from decouple import config
 from sqlalchemy import text, create_engine
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
-from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG
 from src.helpers.observability_helpers.initial_run_states import generate_dates
+from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, GRAIN_LABEL_MAP
 
 
 # ── low-level existence checks ────────────────────────────────────────────────
+
 
 def _blob_path_for_date(ts: pendulum.DateTime, azure_path_env: str) -> str:
     """
@@ -137,7 +138,8 @@ def upsert_state_fn(
 ):
     """Idempotent upsert for processing_state."""
     conn = psycopg2.connect(config("DB_CONN_RAW"))
-    completeness_ratio = round(actual_count / expected_count, 4) if expected_count and actual_count is not None else None
+    completeness_ratio = round(actual_count / expected_count,
+                               4) if expected_count and actual_count is not None else None
     is_acceptable = completeness_ratio >= 1.0 if completeness_ratio is not None else None
 
     query = """
@@ -241,17 +243,21 @@ def reconcile_processing_state(
             status = "pending"
             actual_count = 0
 
+        grain = cfg["grain"]
 
+        period_name = GRAIN_LABEL_MAP.get(cfg["grain"], lambda d: None)(d)
 
         upsert_state_fn(
             processing_level=pipeline_name,
             partition_date=d,
+            period_name=period_name,
             status=status,
             expected_count=expected_count,
             actual_count=actual_count,
         )
 
     logger.info(f"[reconcile] {pipeline_name}: done")
+
 
 def enough_months_quarter(year, quarter):
     engine = create_engine(config("DB_CONN_RAW"))
@@ -275,5 +281,3 @@ def enough_months_quarter(year, quarter):
         ).scalar()
 
     return months_count
-
-

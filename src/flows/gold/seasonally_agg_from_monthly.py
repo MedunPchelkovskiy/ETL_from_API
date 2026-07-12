@@ -213,14 +213,14 @@ def monthly_to_seasonally_aggregation():
         period_start_month = data[0][0]
         try:
             season_summ = get_seasonally_summ_data(season, year, data)
-            upsert_state_fn(
-                processing_level=PIPELINE_NAME,
-                partition_date=period_start_month,
-                period_name=season_label,
-                status="success",
-                expected_count=len(expected),
-                actual_count=len(expected),
-            )
+            # upsert_state_fn(
+            #     processing_level=PIPELINE_NAME,
+            #     partition_date=period_start_month,
+            #     period_name=season_label,
+            #     status="success",
+            #     expected_count=len(expected),
+            #     actual_count=len(expected),
+            # )
 
             # upsert_state_fn(
             #     processing_level=PIPELINE_NAME,
