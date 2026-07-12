@@ -35,6 +35,9 @@ def generate_dates(start_date, end_date, grain: str ) -> List[pendulum.DateTime]
         elif grain == "month":
             current = current.add(months=1)
 
+        elif grain == "season":
+            current = current.add(months=3)
+
         else:
             raise ValueError(f"Unsupported grain: {grain}")
 
