@@ -25,6 +25,10 @@ expected_months_map = {
 def get_quarter(datetime_obj: pendulum.DateTime):
     return (datetime_obj.month - 1) // 3 + 1
 
+def expand_season_to_months(season_start: pendulum.DateTime) -> list[pendulum.DateTime]:
+    """From season start (for example 2026-03-01) generate 3 dates for current season months start."""
+    return [season_start.add(months=i) for i in range(3)]
+
 def group_months_by_season(
     pending_months: list[pendulum.DateTime],
 ) -> dict[str, list[pendulum.DateTime]]:

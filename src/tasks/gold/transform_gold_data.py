@@ -80,7 +80,7 @@ def aggregate_gold_months(all_months_dfs, expected_months, max_missing_ratio, ye
 def get_seasonally_summ_data(season, year, data) -> pd.DataFrame:
     logger = get_logger()
     logger.info(f"Start task aggregate monthly to seasonally data for {season}_{year}")
-    aggregated_quarter = aggregate_months_to_season(season, year, data)
+    aggregated_season = aggregate_months_to_season(season, year, data)
     logger.info(f"End task aggregate monthly to seasonally data for {season}_{year}")
 
-    return aggregated_quarter
+    return aggregated_season

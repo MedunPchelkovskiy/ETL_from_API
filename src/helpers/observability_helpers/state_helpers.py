@@ -107,19 +107,38 @@ def get_last_reconciled_date(pipeline_name: str, period_name: str | None = None)
         conn.close()
 
 
-def get_current_retry_count(processing_level: str, partition_date: pendulum.DateTime) -> int:
+def get_current_retry_count(
+    processing_level: str,
+    partition_date: pendulum.DateTime,
+    period_name: str | None = None,
+) -> int:
     """Reads the current retry_count for a single row."""
     conn = psycopg2.connect(config("DB_CONN_RAW"))
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT retry_count
-                FROM processing_state
-                WHERE processing_level = %s AND partition_date = %s
-                """,
-                (processing_level, partition_date.date()),
-            )
+            if period_name is None:
+                cur.execute(
+                    """
+                    SELECT retry_count
+                    FROM processing_state
+                    WHERE processing_level = %s
+                      AND partition_date = %s
+                      AND period_name IS NULL
+                    """,
+                    (processing_level, partition_date.date()),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT retry_count
+                    FROM processing_state
+                    WHERE processing_level = %s
+                      AND partition_date = %s
+                      AND period_name = %s
+                    """,
+                    (processing_level, partition_date.date(), period_name),
+                )
+
             row = cur.fetchone()
             return row[0] if row else 0
     finally:
