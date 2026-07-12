@@ -703,7 +703,7 @@ def load_gold_seasonally_summ_data_to_postgres_worker(
     stmt = text("""
         INSERT INTO gold_seasonally_summarized_data (
             place_name, year, generated_at,
-            period_type, period_start,
+            season_name, period_start,
             temp_max, temp_min, temp_avg,
             rain_min, rain_max, rain_avg,
             snow_min, snow_max, snow_avg,
@@ -712,7 +712,7 @@ def load_gold_seasonally_summ_data_to_postgres_worker(
             humidity_min, humidity_max, humidity_avg
         ) VALUES (
             :place_name, :year, :generated_at,
-            :period_type, :period_start,
+            :season_name, :period_start,
             :temp_max, :temp_min, :temp_avg,
             :rain_min, :rain_max, :rain_avg,
             :snow_min, :snow_max, :snow_avg,
@@ -720,7 +720,7 @@ def load_gold_seasonally_summ_data_to_postgres_worker(
             :cloud_cover_min, :cloud_cover_max, :cloud_cover_avg,
             :humidity_min, :humidity_max, :humidity_avg
         )
-        ON CONFLICT (place_name, year, period_type) DO UPDATE SET
+        ON CONFLICT (place_name, year, season_name) DO UPDATE SET
         period_start = EXCLUDED.period_start,
         temp_max = EXCLUDED.temp_max,
         temp_min = EXCLUDED.temp_min,

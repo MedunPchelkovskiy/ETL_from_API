@@ -70,13 +70,13 @@ PIPELINE_CONFIG = {
         "max_retries": 3,
         },
     "gold_seasonal": {
-        "grain": "month",
+        "grain": "season",
         "max_missing_ratio": 0.33,
         "expected_count": 3,
         "source_check": "azure+postgres",
-        "azure_path_env": "BASE_DIR_MONTHLY_SUMM_GOLD",      # месечен INPUT, не seasonal output
-        "postgres_table": "gold_monthly_summarized_data",     # месечен INPUT
-        "postgres_date_col": "month_start",                   # колоната в месечната таблица
+        "azure_path_env": "BASE_DIR_SEASONALLY_SUMM_GOLD",
+        "postgres_table": "gold_seasonally_summarized_data",
+        "postgres_date_col": "period_start",
         "max_retries": 3,
     },
     # "gold_seasonal": {

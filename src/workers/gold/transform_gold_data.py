@@ -199,7 +199,7 @@ def aggregate_months_to_season(season, year, data) -> pd.DataFrame:
     ).reset_index().round(2)
     seasonally_summ_df["year"] = year
     seasonally_summ_df["period_start"] = period_start
-    seasonally_summ_df["period_type"] = season # може би ще направя мапър с имаената на сезоните с value началана дата("period_start")
+    seasonally_summ_df["season_name"] = season # може би ще направя мапър с имаената на сезоните с value началана дата("period_start")
     seasonally_summ_df["generated_at"] = pendulum.now("UTC")
 
     return seasonally_summ_df
