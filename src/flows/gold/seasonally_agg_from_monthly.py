@@ -51,8 +51,7 @@ def monthly_to_seasonally_aggregation():
             "utc_time": now.to_iso8601_string(),
         },
     )
-    end_date = now.start_of("month")  # текущият месец excluded
-    max_missing = 0
+    end_date = now.start_of("month")  # current month excluded
 
     if last_reconciled is None:
         try:
@@ -164,16 +163,6 @@ def monthly_to_seasonally_aggregation():
                 error_type="missing_partitions",
                 error_message=error_message,
             )
-
-            # upsert_state_fn(
-            #     processing_level=PIPELINE_NAME,
-            #     partition_date=period_start_month,
-            #     status=status,
-            #     expected_count=len(expected),
-            #     actual_count=len(season_months),
-            #     error_type="missing_partitions",
-            #     error_message=error_message,
-            # )
 
             continue
 
