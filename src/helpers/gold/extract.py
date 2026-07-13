@@ -105,11 +105,10 @@ def get_oldest_monthly_date_azure(fs_client, base_dir):
 
     return year, month
 
-def get_oldest_monthly_date_postgres(db_conn):
-    engine = create_engine(db_conn)
-    query = """
+def get_oldest_monthly_date_postgres(engine, table_name):
+    query = f"""
        SELECT MIN(month_start)
-         FROM gold_monthly_summarized_data
+         FROM "{table_name}"
    """
 
     with engine.connect() as conn:
@@ -121,6 +120,46 @@ def get_oldest_monthly_date_postgres(db_conn):
     month = oldest_month.month
 
     return year, month
+
+def get_oldest_season_year_azure(fs_client, base_dir):
+    paths = fs_client.get_paths(path=base_dir)
+    all_paths = sorted([
+        p.name for p in paths
+        if p.name.endswith(".parquet")
+    ])
+    if not all_paths:
+        raise ValueError(f"No parquet files found under {base_dir}")
+
+    oldest_month = all_paths[0]
+    parts = oldest_month.split("/")
+    filename = parts[-1].replace(".parquet", "")
+    season, year = filename.split("_")
+    year = int(year)
+
+    return season, year
+
+
+def get_oldest_season_year_postgres(engine, table_name):
+    query = f"""
+         SELECT period_start, season_name
+           FROM "{table_name}"
+       ORDER BY period_start ASC
+          LIMIT 1;
+   """
+
+    with engine.connect() as conn:
+        result = conn.execute(text(query)).fetchone()
+    if result is None or result[0] is None:
+        raise ValueError("No data in gold_seasonally_summarized_data")
+    oldest_period = result[0]
+    season = result[1]
+    year = oldest_period.year
+
+    return year, season
+
+
+
+
 
 def get_last_gold_timestamp_postgres(engine, table_name):
     """

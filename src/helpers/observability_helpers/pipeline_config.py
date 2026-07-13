@@ -119,3 +119,26 @@ GRAIN_LABEL_MAP = {
     "month": lambda d: f"{d.format('MMMM').lower()}_{d.year}",  # "july_2026"
     "season": lambda d: f"{QUARTER_START_MONTH[d.month]}_{d.year + 1 if QUARTER_START_MONTH[d.month] == 'winter' else d.year}",  # summer_2026
 }
+
+SEASON_START_MONTH = {
+    "spring": 3,
+    "summer": 6,
+    "autumn": 9,
+    "winter": 12,
+}
+
+GRAIN_START = {
+    "hour": lambda d: d.start_of("hour"),
+    "day": lambda d: d.start_of("day"),
+    "week": lambda d: d.start_of("week"),
+    "month": lambda d: d.start_of("month"),
+    "season": lambda d: d.set(month=((d.month - 1) // 3) * 3 + 1).start_of("month"),
+}
+
+GRAIN_STEP = {
+    "hour": lambda d: d.add(hours=1),
+    "day": lambda d: d.add(days=1),
+    "week": lambda d: d.add(weeks=1),
+    "month": lambda d: d.add(months=1),
+    "season": lambda d: d.add(months=3),
+}

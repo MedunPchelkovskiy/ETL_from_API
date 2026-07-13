@@ -4,9 +4,11 @@ from azure.core.exceptions import ResourceNotFoundError
 from decouple import config
 from sqlalchemy import text, create_engine
 
+from src.helpers.gold.extract import get_oldest_season_year_azure, get_oldest_season_year_postgres, \
+    get_oldest_monthly_date_azure, get_oldest_monthly_date_postgres
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.initial_run_states import generate_dates
-from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, GRAIN_LABEL_MAP
+from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, GRAIN_LABEL_MAP, SEASON_START_MONTH
 
 
 # ── low-level existence checks ────────────────────────────────────────────────
@@ -108,9 +110,9 @@ def get_last_reconciled_date(pipeline_name: str, period_name: str | None = None)
 
 
 def get_current_retry_count(
-    processing_level: str,
-    partition_date: pendulum.DateTime,
-    period_name: str | None = None,
+        processing_level: str,
+        partition_date: pendulum.DateTime,
+        period_name: str | None = None,
 ) -> int:
     """Reads the current retry_count for a single row."""
     conn = psycopg2.connect(config("DB_CONN_RAW"))
@@ -262,8 +264,6 @@ def reconcile_processing_state(
             status = "pending"
             actual_count = 0
 
-        grain = cfg["grain"]
-
         period_name = GRAIN_LABEL_MAP.get(cfg["grain"], lambda d: None)(d)
 
         upsert_state_fn(
@@ -300,3 +300,22 @@ def enough_months_quarter(year, quarter):
         ).scalar()
 
     return months_count
+
+def _get_oldest_available(pipeline_name, fs_client, engine,  season_cfg, monthly_cfg):
+    logger = get_logger()
+    try:
+        season, year = get_oldest_season_year_azure(fs_client, season_cfg["azure_path_env"])
+    except ValueError as e:
+        try:
+            logger.warning(f"[{pipeline_name}] Azure failed, falling back to Postgres | {e}")
+            season, year = get_oldest_season_year_postgres(engine, season_cfg["postgres_table"])
+        except ValueError as e2:
+            try:
+                year, month = get_oldest_monthly_date_azure(fs_client, monthly_cfg["azure_path_env"])
+            except ValueError as e3:
+                year, month = get_oldest_monthly_date_postgres(engine, monthly_cfg["postgres_table"])
+
+    month = SEASON_START_MONTH[season]
+
+    return year, month
+

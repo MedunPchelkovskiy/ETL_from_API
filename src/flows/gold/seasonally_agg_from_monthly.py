@@ -8,14 +8,15 @@ from sqlalchemy import create_engine
 from src.clients.datalake_client import fs_client
 from src.core.exceptions import DataIssueError
 from src.helpers.gold.extract import expected_months_map, \
-    get_oldest_monthly_date_azure, get_oldest_monthly_date_postgres, expand_season_to_months
+    expand_season_to_months, \
+    get_oldest_season_year_azure, get_oldest_season_year_postgres
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.decorators import measure_flow_duration
 from src.helpers.observability_helpers.find_process_state import get_pending_work
 from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, PIPELINE_STATUS_MAP, PIPELINE_ERROR_MAP, \
-    QUARTER_START_MONTH
+    QUARTER_START_MONTH, SEASON_START_MONTH
 from src.helpers.observability_helpers.state_helpers import reconcile_processing_state, get_last_reconciled_date, \
-    upsert_state_fn, get_current_retry_count
+    upsert_state_fn, get_current_retry_count, _get_oldest_available
 from src.tasks.gold.extract_from_gold import get_monthly_gold_azure, get_monthly_gold_postgres
 from src.tasks.gold.load_gold_data import load_gold_seasonally_summ_data_to_azure, \
     load_gold_seasonally_summ_data_to_postgres
@@ -54,11 +55,9 @@ def monthly_to_seasonally_aggregation():
     end_date = now.start_of("month")  # current month excluded
 
     if last_reconciled is None:
-        try:
-            year, month = get_oldest_monthly_date_azure(fs_client, config("BASE_DIR_SEASONALLY_SUMM_GOLD"))
-        except Exception as e:
-            logger.warning(f"[{PIPELINE_NAME}] Azure failed, falling back to Postgres | {e}")
-            year, month = get_oldest_monthly_date_postgres(config("DB_CONN_RAW"))
+        year, month =  _get_oldest_available(pipeline_name=PIPELINE_NAME, fs_client=fs_client, engine=engine,  season_cfg = PIPELINE_CONFIG["gold_seasonal"], monthly_cfg = PIPELINE_CONFIG["gold_monthly"])
+
+
         reconcile_start = pendulum.datetime(year=year, month=month, day=1)
         logger.info(f"[{PIPELINE_NAME}] First run — reconciling from {year}-{month}")
     else:

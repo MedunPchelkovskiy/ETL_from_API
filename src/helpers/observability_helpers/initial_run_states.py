@@ -7,39 +7,26 @@ from azure.core.exceptions import ResourceNotFoundError
 from decouple import config
 
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.helpers.observability_helpers.pipeline_config import GRAIN_START, GRAIN_STEP
 
 
-def generate_dates(start_date, end_date, grain: str ) -> List[pendulum.DateTime]:
+def generate_dates(start_date, end_date, grain: str, ) -> List[pendulum.DateTime]:
     """
     Generates partitions based on grain: daily / weekly / monthly
     """
+    if grain not in GRAIN_START or grain not in GRAIN_STEP:
+        raise ValueError(f"Unsupported grain: {grain}")
 
-    start_date = pendulum.instance(start_date).start_of(grain)
-    end_date = pendulum.instance(end_date).start_of(grain)
-
-    dates = []
+    start_date = GRAIN_START[grain](pendulum.instance(start_date))
+    end_date = GRAIN_START[grain](pendulum.instance(end_date))
 
     current = start_date
+    dates = []
+
 
     while current < end_date:        # TODO: note that end_date is excluded!!!!!
         dates.append(current)
-        if grain == "hour":
-            current = current.add(hours=1)
-
-        elif grain == "day":
-            current = current.add(days=1)
-
-        elif grain == "week":
-            current = current.add(weeks=1)
-
-        elif grain == "month":
-            current = current.add(months=1)
-
-        elif grain == "season":
-            current = current.add(months=3)
-
-        else:
-            raise ValueError(f"Unsupported grain: {grain}")
+        current = GRAIN_STEP[grain](current)
 
     return dates
 
