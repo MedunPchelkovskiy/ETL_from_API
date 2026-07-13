@@ -132,7 +132,8 @@ GRAIN_START = {
     "day": lambda d: d.start_of("day"),
     "week": lambda d: d.start_of("week"),
     "month": lambda d: d.start_of("month"),
-    "season": lambda d: d.set(month=((d.month - 1) // 3) * 3 + 1).start_of("month"),
+    "season": lambda d: (
+    d.set(month=12, day=1).subtract(years=1) if d.month in (1, 2) else d.set(month=((d.month - 3) // 3) * 3 + 3, day=1)).start_of("month"),
 }
 
 GRAIN_STEP = {

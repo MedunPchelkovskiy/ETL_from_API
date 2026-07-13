@@ -55,9 +55,14 @@ def monthly_to_seasonally_aggregation():
     end_date = now.start_of("month")  # current month excluded
 
     if last_reconciled is None:
-        year, month =  _get_oldest_available(pipeline_name=PIPELINE_NAME, fs_client=fs_client, engine=engine,  season_cfg = PIPELINE_CONFIG["gold_seasonal"], monthly_cfg = PIPELINE_CONFIG["gold_monthly"])
-
-
+        try:
+            year, month = _get_oldest_available(
+                pipeline_name=PIPELINE_NAME, fs_client=fs_client, engine=engine,
+                season_cfg=PIPELINE_CONFIG["gold_seasonal"], monthly_cfg=PIPELINE_CONFIG["gold_monthly"],
+            )
+        except ValueError as e:
+            logger.info(f"[{PIPELINE_NAME}] No source data found anywhere — nothing to reconcile yet | {e}")
+            return Completed(message="Skipped-NoSourceDataYet")
         reconcile_start = pendulum.datetime(year=year, month=month, day=1)
         logger.info(f"[{PIPELINE_NAME}] First run — reconciling from {year}-{month}")
     else:
@@ -66,7 +71,7 @@ def monthly_to_seasonally_aggregation():
             f"[{PIPELINE_NAME}] Reconciling from {reconcile_start.to_date_string()} "
             f"→ {end_date.to_date_string()}"
         )
-
+    logger.info(f"[{PIPELINE_NAME}] DEBUG reconcile_start={reconcile_start} last_reconciled={last_reconciled}")
     reconcile_processing_state(
         pipeline_name=PIPELINE_NAME,
         start_date=reconcile_start,

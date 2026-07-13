@@ -301,21 +301,31 @@ def enough_months_quarter(year, quarter):
 
     return months_count
 
-def _get_oldest_available(pipeline_name, fs_client, engine,  season_cfg, monthly_cfg):
+
+def _get_oldest_available(pipeline_name, fs_client, engine, season_cfg, monthly_cfg):
     logger = get_logger()
     try:
-        season, year = get_oldest_season_year_azure(fs_client, season_cfg["azure_path_env"])
+        season, year = get_oldest_season_year_azure(fs_client, config(season_cfg["azure_path_env"]))
+        month = SEASON_START_MONTH[season]
     except ValueError as e:
         try:
             logger.warning(f"[{pipeline_name}] Azure failed, falling back to Postgres | {e}")
             season, year = get_oldest_season_year_postgres(engine, season_cfg["postgres_table"])
+            month = SEASON_START_MONTH[season]
+
         except ValueError as e2:
             try:
-                year, month = get_oldest_monthly_date_azure(fs_client, monthly_cfg["azure_path_env"])
+                year, month = get_oldest_monthly_date_azure(fs_client, config(monthly_cfg["azure_path_env"]))
+                year, month = _round_down_to_season_start(year, month)
             except ValueError as e3:
                 year, month = get_oldest_monthly_date_postgres(engine, monthly_cfg["postgres_table"])
-
-    month = SEASON_START_MONTH[season]
+                year, month = _round_down_to_season_start(year, month)
 
     return year, month
 
+def _round_down_to_season_start(year, month):
+    if month in (1, 2):
+        return year - 1, 12
+    for season_month in (12, 9, 6, 3):
+        if month >= season_month:
+            return year, season_month

@@ -4,6 +4,7 @@ from typing import Optional
 import pandas as pd
 import pendulum
 import psycopg2
+from azure.core.exceptions import ResourceNotFoundError
 from decouple import config
 from sqlalchemy import create_engine, text
 
@@ -122,11 +123,15 @@ def get_oldest_monthly_date_postgres(engine, table_name):
     return year, month
 
 def get_oldest_season_year_azure(fs_client, base_dir):
-    paths = fs_client.get_paths(path=base_dir)
-    all_paths = sorted([
-        p.name for p in paths
-        if p.name.endswith(".parquet")
-    ])
+    try:
+        paths = fs_client.get_paths(path=base_dir)
+        all_paths = sorted([
+            p.name for p in paths
+            if p.name.endswith(".parquet")
+        ])
+    except ResourceNotFoundError as e:
+        raise ValueError(f"Path {base_dir} does not exist")
+
     if not all_paths:
         raise ValueError(f"No parquet files found under {base_dir}")
 
