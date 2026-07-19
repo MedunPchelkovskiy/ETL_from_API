@@ -32,6 +32,7 @@ def monthly_to_seasonally_aggregation():
     now = pendulum.now("UTC")
     engine = create_engine(config("DB_CONN_RAW"))
     cfg = PIPELINE_CONFIG[PIPELINE_NAME]
+    expected_count = cfg["expected_count"]
 
     # ── early gate ────────────────────────────────────────────────────────────
     """
@@ -113,30 +114,26 @@ def monthly_to_seasonally_aggregation():
             month_label = month.to_date_string()
             try:
                 month_df = get_monthly_gold_azure(month)
-                all_seasons_dfs.setdefault(season_label, []).append((month, month_df))
+                if season_label not in missing_months:  # ← само ако сезонът все още е "чист"
+                    all_seasons_dfs.setdefault(season_label, []).append((month, month_df))
             except Exception as e:
-                logger.warning(
-                    f"[{PIPELINE_NAME}] Azure failed for {month_label}, falling back to Postgres | {e}"
-                )
+                logger.warning(f"[{PIPELINE_NAME}] Azure failed for {month_label}, falling back to Postgres | {e}")
                 try:
                     month_df = get_monthly_gold_postgres(month)
-                    all_seasons_dfs.setdefault(season_label, []).append((month, month_df))
+                    if season_label not in missing_months:
+                        all_seasons_dfs.setdefault(season_label, []).append((month, month_df))
                 except Exception as e2:
-                    logger.error(
-                        f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}"
-                    )
+                    logger.error(f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}")
                     missing_months.setdefault(season_label, set()).add(month.month)
+                    all_seasons_dfs.pop(season_label, None)  # премахва вече натрупаните частични данни
                     continue
 
         # ── missing months gate ─────────────────────────────────────────────────
 
         if season_label in missing_months:
-            period_start_month = int(min(expected))
-            if season_name == "winter":
-                year = season_year - 1
-            else:
-                year = season_year
-            period_start = pendulum.datetime(year, period_start_month, 1)
+            period_start_month = SEASON_START_MONTH[season_name]
+            period_start_year = season_year - 1 if season_name == "winter" else season_year
+            period_start = pendulum.datetime(period_start_year, period_start_month, 1)
             current_retries = get_current_retry_count(PIPELINE_NAME, period_start, period_name=season_label)
 
             if current_retries >= cfg["max_retries"]:
@@ -162,7 +159,7 @@ def monthly_to_seasonally_aggregation():
                 partition_date=period_start,
                 period_name=season_label,
                 status=status,
-                expected_count=len(expected),
+                expected_count=expected_count,
                 actual_count=len(season_months) - len(missing_months[season_label]),
                 error_type="missing_partitions",
                 error_message=error_message,
@@ -172,33 +169,32 @@ def monthly_to_seasonally_aggregation():
 
     # ── transform ─────────────────────────────────────────────────
     season_data_aggregated = {}
+    transform_failed_seasons = []
     for season_label, data in all_seasons_dfs.items():
         season, year = season_label.split("_")
         year = int(year)
-        period_start_month = pendulum.datetime(
-            year - 1 if season == "winter" else year,
-            int(min(expected_months_map[season])),
-            1
-        )
+        period_start_month = SEASON_START_MONTH[season]
+        period_start_year = year - 1 if season == "winter" else year
+        period_start = pendulum.datetime(period_start_year, period_start_month, 1)
         try:
             season_summ = get_seasonally_summ_data(season, year, data)
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=period_start_month,
+                partition_date=period_start,
                 period_name=season_label,
                 status="processing",
-                expected_count=len(expected),
-                actual_count=len(expected),
+                expected_count=expected_count,
+                actual_count=len(data),
             )
 
         except DataIssueError as e:
             # data / business issue
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=period_start_month,
+                partition_date=period_start,
                 period_name=season_label,
                 status="pending",
-                expected_count=len(expected_months_map[season]),
+                expected_count=expected_count,
                 error_message=str(e),
             )
             continue
@@ -207,12 +203,15 @@ def monthly_to_seasonally_aggregation():
             # bug / unexpected
             upsert_state_fn(
                 processing_level=PIPELINE_NAME,
-                partition_date=period_start_month,
+                partition_date=period_start,
                 period_name=season_label,
                 status="failed",
+                expected_count=expected_count,
+                error_type="missing_partitions",
                 error_message=str(e)
             )
-            raise
+            transform_failed_seasons.append(season_label)
+            continue
         season_data_aggregated[season_label] = season_summ
 
     # ── load ─────────────────────────────────────────────────
@@ -220,12 +219,9 @@ def monthly_to_seasonally_aggregation():
     for season_label, df in season_data_aggregated.items():
         season_name, season_year = season_label.split("_")
         season_year = int(season_year)
-        expected = expected_months_map[season_name]
-        period_start_month = int(min(expected))
-        if season_name == "winter":
-            period_start = pendulum.datetime(season_year - 1, period_start_month, 1)
-        else:
-            period_start = pendulum.datetime(season_year, period_start_month, 1)
+        period_start_month = SEASON_START_MONTH[season_name]
+        period_start_year = season_year - 1 if season_name == "winter" else season_year
+        period_start = pendulum.datetime(period_start_year, period_start_month, 1)
 
         azure_ok = False
         postgres_ok = False
@@ -248,8 +244,8 @@ def monthly_to_seasonally_aggregation():
                 partition_date=period_start,
                 period_name=season_label,
                 status="success",
-                expected_count=len(expected),
-                actual_count=len(expected),
+                expected_count=expected_count,
+                actual_count=expected_count,
             )
         else:
             upsert_state_fn(
@@ -257,31 +253,31 @@ def monthly_to_seasonally_aggregation():
                 partition_date=period_start,
                 period_name=season_label,
                 status="failed",
-                expected_count=len(expected),
+                expected_count=expected_count,
                 actual_count=0,
                 error_type="missing_partitions",
                 error_message="Both Azure and Postgres load failed",
             )
             failed_seasons.append(season_label)
-    # ── final report ──────────────────────────────────────────────────────────
+    # ── final report ─────────────────────────────────────────────────────────
+
+    if missing_months:
+        logger.warning(f"[{PIPELINE_NAME}] Skipped missing data: {missing_months}")
+    all_failed = list(set(list(missing_months.keys()) + failed_seasons + transform_failed_seasons))
     logger.info(
         f"[{PIPELINE_NAME}] Finished | "
         f"processed={len(season_data_aggregated)} | "
         f"missed={len(missing_months)} | "
-        f"failed={len(failed_seasons)}",
+        f"failed={len(failed_seasons) + len(transform_failed_seasons)}",
         extra={
             "flow_run_id": prefect.runtime.flow_run.id,
             "utc_time": pendulum.now("UTC").to_iso8601_string(),
         },
     )
+    if all_failed:
+        return Completed(message=f"Partial-Failure: {len(all_failed)} season(s) failed: {all_failed}")
 
-    if missing_months:
-        logger.warning(f"[{PIPELINE_NAME}] Skipped missing data: {missing_months}")
-
-    if failed_seasons:
-        raise RuntimeError(
-            f"[{PIPELINE_NAME}] Both Azure and Postgres load failed for: {failed_seasons}"
-        )
+    return Completed(message=f"Success: {len(season_data_aggregated)} season(s) processed")
 
 
 if __name__ == "__main__":
