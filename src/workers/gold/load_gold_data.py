@@ -680,7 +680,7 @@ def load_gold_yearly_summ_data_to_postgres_worker(
 
 def load_seasonal_summ_data_to_azure_worker(seasonal_agg_df):
     year_str = str(seasonal_agg_df["year"].iloc[0])
-    period_type = str(seasonal_agg_df["period_type"].iloc[0])
+    period_type = str(seasonal_agg_df["season_name"].iloc[0])
     file_name = f"{period_type}_{year_str}.parquet"
     # Convert to Parquet bytes
     parquet_buffer = io.BytesIO()

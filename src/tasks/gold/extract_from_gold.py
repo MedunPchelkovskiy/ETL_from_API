@@ -10,6 +10,7 @@ from src.clients.datalake_client import fs_client
 from src.helpers.gold.extract import get_last_processed_timestamp
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.decorators import measure_task_duration
+from src.helpers.observability_helpers.pipeline_config import PIPELINE_CONFIG, GRAIN_LABEL_MAP
 from src.helpers.observability_helpers.pushgateway_utils import push_task_metrics
 from src.workers.gold.extract_gold_data import get_hourly_blobs_for_day, get_hourly_data_postgres, \
     get_daily_blobs_for_week, get_daily_data_postgres, get_monthly_blob_for_year, get_monthly_record_for_year
@@ -141,43 +142,52 @@ def get_hourly_gold_postgres(pipeline_name, forecast_day):
     return result
 
 
+# @task(name="get daily summ gold blobs", retries=3, retry_delay_seconds=60)
+# @measure_task_duration(flow_name="gold_flow", task_name="get_daily_gold_azure", on_complete=push_task_metrics)
+# def get_daily_gold_azure(week_dates: list[pendulum.DateTime],
+#                          ) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
+#     logger = get_logger()
+#     start_time = pendulum.now("UTC")
+#
+#     logger.info(f"Fetching week: {week_dates[0]} → {week_dates[-1]}")      #TODO: eventually f"{week_dates[0].to_date_string()} → {week_dates[-1].to_date_string()}" if log is not only date
+#
+#     all_days_dfs, missing_days = get_daily_blobs_for_week(week_dates, fs_client)
+#
+#     logger.info(f"Weekly blobs — fetched: {len(all_days_dfs)}/7 days | missing: {missing_days}")
+#
+#     if missing_days:
+#         logger.warning(f"Proceeding with {len(missing_days)} missing day(s): {missing_days}")
+#
+#     duration = (pendulum.now("UTC") - start_time).total_seconds()
+#     logger.info(
+#         f"Finished fetching. "
+#         f"Days fetched: {len(all_days_dfs)}/7. "
+#         f"Duration: {duration:.2f}s"
+#     )
+#
+#     return all_days_dfs, missing_days
+
+
 @task(name="get daily summ gold blobs", retries=3, retry_delay_seconds=60)
 @measure_task_duration(flow_name="gold_flow", task_name="get_daily_gold_azure", on_complete=push_task_metrics)
-def get_daily_gold_azure(week_dates: list[pendulum.DateTime],
-                         ) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
+def get_daily_gold_azure(days: list[pendulum.DateTime], pipeline_name: str,) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
     logger = get_logger()
     start_time = pendulum.now("UTC")
+    grain = PIPELINE_CONFIG[pipeline_name]["grain"]
+    period_label = GRAIN_LABEL_MAP[grain](days[0])   # "february_2026", "week_28_2026", etc.
 
-    logger.info(f"Fetching week: {week_dates[0]} → {week_dates[-1]}")      #TODO: eventually f"{week_dates[0].to_date_string()} → {week_dates[-1].to_date_string()}" if log is not only date
+    logger.info(f"[{pipeline_name}] Fetching {grain} {period_label}: {len(days)} day(s), "
+                f"{days[0].to_date_string()} → {days[-1].to_date_string()}")
 
-    all_days_dfs, missing_days = get_daily_blobs_for_week(week_dates, fs_client)
+    all_days_dfs, missing_days = get_daily_blobs_for_week(days, fs_client)
 
-    logger.info(f"Weekly blobs — fetched: {len(all_days_dfs)}/7 days | missing: {missing_days}")
-
+    logger.info(f"[{pipeline_name}] {period_label} — fetched: {len(all_days_dfs)}/{len(days)} days | missing: {missing_days}")
     if missing_days:
-        logger.warning(f"Proceeding with {len(missing_days)} missing day(s): {missing_days}")
+        logger.warning(f"[{pipeline_name}] {period_label} — proceeding with {len(missing_days)} missing day(s): {missing_days}")
 
     duration = (pendulum.now("UTC") - start_time).total_seconds()
-    logger.info(
-        f"Finished fetching. "
-        f"Days fetched: {len(all_days_dfs)}/7. "
-        f"Duration: {duration:.2f}s"
-    )
-
+    logger.info(f"[{pipeline_name}] {period_label} — finished. Days fetched: {len(all_days_dfs)}/{len(days)}. Duration: {duration:.2f}s")
     return all_days_dfs, missing_days
-#
-# @task(name="Extract daily gold blobs", retries=3, retry_delay_seconds=60)
-# def task_get_daily_gold_azure(
-#         week_dates: list[pendulum.DateTime],
-# ) -> tuple[list[tuple[pendulum.DateTime, object]], list[str]]:
-#     """
-#     Fetches daily parquet files from Azure for the given week_dates.
-#     Retries on infrastructure errors (connection, timeout).
-#     Missing days are returned — NOT raised — business logic lives in flow.
-#     """
-#     logger = get_logger()
-#     logger.info(f"Fetching {len(week_dates)} days from Azure")
-#     return get_daily_blobs_for_week(week_dates, fs_client)
 
 
 @task(name="get daily summ gold postgres")

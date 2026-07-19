@@ -92,7 +92,7 @@ def daily_to_monthly_aggregation():
         )
         # ── extract: Azure first, Postgres fallback ───────────────────────────
         try:
-            all_days_dfs, missing_days = get_daily_gold_azure(month_days)
+            all_days_dfs, missing_days = get_daily_gold_azure(month_days, pipeline_name=PIPELINE_NAME)
         except Exception as e:
             logger.warning(
                 f"[{PIPELINE_NAME}] Azure failed for {month_label}, falling back to Postgres | {e}"
