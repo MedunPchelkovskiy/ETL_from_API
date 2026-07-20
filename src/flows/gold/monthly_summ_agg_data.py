@@ -91,29 +91,17 @@ def daily_to_monthly_aggregation():
             expected_count=expected_days,
         )
         # ── extract: Azure first, Postgres fallback ───────────────────────────
-        try:
-            all_days_dfs, missing_days = get_daily_gold_azure(month_days, pipeline_name=PIPELINE_NAME)
-        except Exception as e:
-            logger.warning(
-                f"[{PIPELINE_NAME}] Azure failed for {month_label}, falling back to Postgres | {e}"
-            )
-            try:
-                all_days_dfs, missing_days = get_daily_gold_postgres(month_days)
-            except Exception as e2:
-                logger.error(
-                    f"[{PIPELINE_NAME}] Postgres fallback also failed for {month_label} | {e2}"
-                )
-                upsert_state_fn(
-                    processing_level=PIPELINE_NAME,
-                    partition_date=month_start,
-                    status="failed",
-                    expected_count=expected_days,
-                    actual_count=0,
-                    error_type="missing_partitions",
-                    error_message=str(e2),
-                )
-                failed_months.append(month_label)
-                continue
+
+        all_days_dfs, missing_days = get_daily_gold_azure(month_days, pipeline_name=PIPELINE_NAME)
+
+        if missing_days:
+            missing_dates = [d for d in month_days if d.to_date_string() in missing_days]
+            logger.info(f"[{PIPELINE_NAME}] {len(missing_dates)} day(s) missing from Azure, trying Postgres")
+
+
+            pg_dfs, still_missing = get_daily_gold_postgres(month_days, engine, pipeline_name=PIPELINE_NAME)
+            all_days_dfs.extend(pg_dfs)
+            missing_days = still_missing
 
         # ── missing days gate ─────────────────────────────────────────────────
         max_missing = round(month_start.days_in_month * max_missing_ratio)  # динамично
@@ -226,24 +214,24 @@ def daily_to_monthly_aggregation():
             )
             failed_months.append(month_label)
     # ── final report ──────────────────────────────────────────────────────────
+    all_failed = list(set(skipped_months) | set(failed_months))
+    if all_failed:
+        logger.warning(f"[{PIPELINE_NAME}] Failed or skipped seasons: {all_failed}")
+
     logger.info(
         f"[{PIPELINE_NAME}] Finished | "
-        f"success={len(all_months_summ)} "
-        f"skipped={len(skipped_months)} "
+        f"processed={len(all_months_summ)} | "
+        f"missed={len(skipped_months)} | "
         f"failed={len(failed_months)}",
         extra={
             "flow_run_id": prefect.runtime.flow_run.id,
             "utc_time": pendulum.now("UTC").to_iso8601_string(),
         },
     )
+    if all_failed:
+        return Completed(message=f"Partial-Failure: {len(all_failed)} season(s) failed: {all_failed}")
 
-    if skipped_months:
-        logger.warning(f"[{PIPELINE_NAME}] Skipped (missing data): {skipped_months}")
-
-    if failed_months:
-        raise RuntimeError(
-            f"[{PIPELINE_NAME}] {len(failed_months)} month(s) failed: {failed_months}"
-        )
+    return Completed(message=f"Success: {len(all_months_summ)} season(s) processed")
 
 if __name__ == "__main__":
     daily_to_monthly_aggregation()

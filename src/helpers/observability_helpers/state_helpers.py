@@ -164,33 +164,33 @@ def upsert_state_fn(
     is_acceptable = completeness_ratio >= 1.0 if completeness_ratio is not None else None
 
     query = """
-        INSERT INTO processing_state (
-            processing_level, partition_date,
-            status, expected_count, actual_count,
-            completeness_ratio, period_name, is_acceptable,
-            updated_at, error_type, error_message
-        )
-        VALUES (
-            %s, %s, %s, %s, %s, %s,
-            %s, %s, NOW(), %s, %s
-        )
-        ON CONFLICT (processing_level, partition_date, (COALESCE(period_name, ''))) DO UPDATE SET
-            period_name        = EXCLUDED.period_name,
-            status             = EXCLUDED.status,
-            expected_count     = EXCLUDED.expected_count,
-            actual_count       = EXCLUDED.actual_count,
-            completeness_ratio = EXCLUDED.completeness_ratio,
-            is_acceptable      = EXCLUDED.is_acceptable,
-            updated_at         = NOW(),
-            error_type         = EXCLUDED.error_type,
-            error_message      = EXCLUDED.error_message,
-            retry_count        = CASE
-                WHEN EXCLUDED.status = 'pending'
-                THEN processing_state.retry_count + 1
-                ELSE processing_state.retry_count
-            END
-        WHERE processing_state.status != 'abandoned';
-    """
+            INSERT INTO processing_state (
+                processing_level, partition_date,
+                status, expected_count, actual_count,
+                completeness_ratio, period_name, is_acceptable,
+                updated_at, error_type, error_message
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, %s,
+                %s, %s, NOW(), %s, %s
+            )
+            ON CONFLICT (processing_level, partition_date) DO UPDATE SET
+                period_name        = COALESCE(EXCLUDED.period_name, processing_state.period_name),
+                status             = EXCLUDED.status,
+                expected_count     = EXCLUDED.expected_count,
+                actual_count       = EXCLUDED.actual_count,
+                completeness_ratio = EXCLUDED.completeness_ratio,
+                is_acceptable      = EXCLUDED.is_acceptable,
+                updated_at         = NOW(),
+                error_type         = EXCLUDED.error_type,
+                error_message      = EXCLUDED.error_message,
+                retry_count        = CASE
+                    WHEN EXCLUDED.status = 'pending'
+                    THEN processing_state.retry_count + 1
+                    ELSE processing_state.retry_count
+                END
+            WHERE processing_state.status != 'abandoned';
+        """
 
     params = [
         processing_level, partition_date.date(), status,

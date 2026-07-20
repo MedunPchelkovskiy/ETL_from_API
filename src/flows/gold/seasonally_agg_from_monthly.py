@@ -8,8 +8,7 @@ from sqlalchemy import create_engine
 from src.clients.datalake_client import fs_client
 from src.core.exceptions import DataIssueError
 from src.helpers.gold.extract import expected_months_map, \
-    expand_season_to_months, \
-    get_oldest_season_year_azure, get_oldest_season_year_postgres
+    expand_season_to_months
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 from src.helpers.observability_helpers.decorators import measure_flow_duration
 from src.helpers.observability_helpers.find_process_state import get_pending_work
@@ -196,6 +195,7 @@ def monthly_to_seasonally_aggregation():
                 status="pending",
                 expected_count=expected_count,
                 error_message=str(e),
+                actual_count=len(data),
             )
             continue
 
@@ -207,7 +207,6 @@ def monthly_to_seasonally_aggregation():
                 period_name=season_label,
                 status="failed",
                 expected_count=expected_count,
-                error_type="missing_partitions",
                 error_message=str(e)
             )
             transform_failed_seasons.append(season_label)
@@ -260,10 +259,10 @@ def monthly_to_seasonally_aggregation():
             )
             failed_seasons.append(season_label)
     # ── final report ─────────────────────────────────────────────────────────
-
-    if missing_months:
-        logger.warning(f"[{PIPELINE_NAME}] Skipped missing data: {missing_months}")
     all_failed = list(set(list(missing_months.keys()) + failed_seasons + transform_failed_seasons))
+    if all_failed:
+        logger.warning(f"[{PIPELINE_NAME}] Failed or skipped seasons: {all_failed}")
+
     logger.info(
         f"[{PIPELINE_NAME}] Finished | "
         f"processed={len(season_data_aggregated)} | "

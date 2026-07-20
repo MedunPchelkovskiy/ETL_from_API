@@ -176,12 +176,12 @@ def get_daily_gold_azure(days: list[pendulum.DateTime], pipeline_name: str,) -> 
     grain = PIPELINE_CONFIG[pipeline_name]["grain"]
     period_label = GRAIN_LABEL_MAP[grain](days[0])   # "february_2026", "week_28_2026", etc.
 
-    logger.info(f"[{pipeline_name}] Fetching {grain} {period_label}: {len(days)} day(s), "
+    logger.info(f"[{pipeline_name}] Fetching from Azure {grain} {period_label}: {len(days)} day(s), "
                 f"{days[0].to_date_string()} → {days[-1].to_date_string()}")
 
     all_days_dfs, missing_days = get_daily_blobs_for_week(days, fs_client)
 
-    logger.info(f"[{pipeline_name}] {period_label} — fetched: {len(all_days_dfs)}/{len(days)} days | missing: {missing_days}")
+    logger.info(f"[{pipeline_name}] {period_label} — fetched from Azure: {len(all_days_dfs)}/{len(days)} days | missing: {missing_days}")
     if missing_days:
         logger.warning(f"[{pipeline_name}] {period_label} — proceeding with {len(missing_days)} missing day(s): {missing_days}")
 
@@ -192,27 +192,26 @@ def get_daily_gold_azure(days: list[pendulum.DateTime], pipeline_name: str,) -> 
 
 @task(name="get daily summ gold postgres")
 @measure_task_duration(flow_name="gold_flow", task_name="get_daily_gold_postgres", on_complete=push_task_metrics)
-def get_daily_gold_postgres(week_dates: list[pendulum.DateTime],
+def get_daily_gold_postgres(days: list[pendulum.DateTime], engine, pipeline_name
                             ) -> tuple[list[tuple[pendulum.DateTime, pd.DataFrame]], list[str]]:
     logger = get_logger()
     start_time = pendulum.now("UTC")
+    grain = PIPELINE_CONFIG[pipeline_name]["grain"]
+    period_label = GRAIN_LABEL_MAP[grain](days[0])
 
-    logger.info("Start task get daily summ gold postgres",
-                extra={
-                    "flow_run_id": prefect.runtime.flow_run.id,
-                    "task_run_id": prefect.runtime.task_run.id
-                })
+    logger.info(f"[{pipeline_name}] Fetching from postgres {grain} {period_label}: {len(days)} day(s), "
+                f"{days[0].to_date_string()} → {days[-1].to_date_string()}")
 
-    engine = create_engine(config("DB_CONN_RAW"))
 
-    logger.info(f"Fetching week: {week_dates[0]} → {week_dates[-1]}")
+    logger.info(f"Fetching week: {days[0]} → {days[-1]}")
 
-    all_days_dfs, missing_days = get_daily_data_postgres(week_dates, engine)
+    all_days_dfs, missing_days = get_daily_data_postgres(days, engine)
 
-    logger.info(f"Weekly records — fetched: {len(all_days_dfs)}/7 days | missing: {missing_days}")
-
+    logger.info(
+        f"[{pipeline_name}] {period_label} — fetched from postgres: {len(all_days_dfs)}/{len(days)} days | missing: {missing_days}")
     if missing_days:
-        logger.warning(f"Proceeding with {len(missing_days)} missing day(s): {missing_days}")
+        logger.warning(
+            f"[{pipeline_name}] {period_label} — proceeding with {len(missing_days)} missing day(s): {missing_days}")
 
     duration = (pendulum.now("UTC") - start_time).total_seconds()
     logger.info(

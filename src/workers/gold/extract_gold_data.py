@@ -76,7 +76,6 @@ def get_daily_blobs_for_week(week_dates: list[pendulum.DateTime], fs_client, ) -
         month = current_ts.format("MM")
         day = current_ts.format("DD")
         file_path = f"{config('BASE_DIR_DAILY_SUMM_GOLD')}/{year}/{month}/{day}.parquet"
-
         try:
             file_client = fs_client.get_file_client(file_path)
             downloaded_bytes = file_client.download_file().readall()
