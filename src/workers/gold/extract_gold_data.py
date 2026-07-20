@@ -136,7 +136,7 @@ def get_daily_data_postgres(week_dates: list[pendulum.DateTime], engine):
 
         if df_day.empty:
             logger.warning(f"Empty data for {current_ts}")
-            missing_days.append(str(current_ts))
+            missing_days.append(current_ts.to_date_string())
         else:
             all_days_dfs.append((current_ts, df_day))
 

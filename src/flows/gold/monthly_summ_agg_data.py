@@ -99,7 +99,7 @@ def daily_to_monthly_aggregation():
             logger.info(f"[{PIPELINE_NAME}] {len(missing_dates)} day(s) missing from Azure, trying Postgres")
 
 
-            pg_dfs, still_missing = get_daily_gold_postgres(month_days, engine, pipeline_name=PIPELINE_NAME)
+            pg_dfs, still_missing = get_daily_gold_postgres(missing_dates, engine, pipeline_name=PIPELINE_NAME)
             all_days_dfs.extend(pg_dfs)
             missing_days = still_missing
 
@@ -216,7 +216,7 @@ def daily_to_monthly_aggregation():
     # ── final report ──────────────────────────────────────────────────────────
     all_failed = list(set(skipped_months) | set(failed_months))
     if all_failed:
-        logger.warning(f"[{PIPELINE_NAME}] Failed or skipped seasons: {all_failed}")
+        logger.warning(f"[{PIPELINE_NAME}] Failed or skipped month(s): {all_failed}")
 
     logger.info(
         f"[{PIPELINE_NAME}] Finished | "
@@ -229,9 +229,9 @@ def daily_to_monthly_aggregation():
         },
     )
     if all_failed:
-        return Completed(message=f"Partial-Failure: {len(all_failed)} season(s) failed: {all_failed}")
+        return Completed(message=f"Partial-Failure: {len(all_failed)} month(s) failed: {all_failed}")
 
-    return Completed(message=f"Success: {len(all_months_summ)} season(s) processed")
+    return Completed(message=f"Success: {len(all_months_summ)} month(s) processed")
 
 if __name__ == "__main__":
     daily_to_monthly_aggregation()
