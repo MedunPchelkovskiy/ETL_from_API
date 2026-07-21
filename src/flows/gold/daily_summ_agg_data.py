@@ -14,6 +14,11 @@ from src.tasks.gold.transform_gold_data import get_daily_summ_data
 @flow(name="Aggregate hourly to daily flow")
 @measure_flow_duration(flow_name="gold_daily_summ_flow")
 def hourly_to_daily_aggregation(forecast_day=None):
+    """
+    In this flow pipeline config, missing hours, processing_state and missing gate
+     is not applied, because during dev process ETL run only on local machine when it is ON.
+     Which means there will be many days with abandoned status because of missing hours.
+    """
     logger = get_logger()
     now = pendulum.now("UTC")
     pipeline_name = "Aggregate hourly to daily flow"
