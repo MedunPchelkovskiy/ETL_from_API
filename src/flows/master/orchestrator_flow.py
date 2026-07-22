@@ -2,8 +2,8 @@ from prefect import flow, runtime
 from prefect.deployments import run_deployment
 
 from logging_config import setup_logging
-from src.helpers.observability_helpers.decorators import measure_flow_duration
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.helpers.observability_helpers.decorators import measure_flow_duration
 from src.helpers.observability_helpers.processing_state_reader import get_processing_state_metrics
 from src.helpers.observability_helpers.pushgateway_utils import push_processing_state_metrics
 
@@ -15,11 +15,10 @@ def orchestrator_flow():
     Orchestrates two Prefect 3 deployments sequentially with structured logging.
     Logs include flow_run_id and task_run_id like your example.
     """
+    # Get logger and run context
+    setup_logging()
+    logger = get_logger()
     try:
-        # Get logger and run context
-        setup_logging()
-        logger = get_logger()
-
         # --- Run bronze deployment ---
         logger.info(
             "Starting First Flow Deployment...",
@@ -81,12 +80,16 @@ def orchestrator_flow():
             }
         )
 
+
     finally:
-        print("DEBUG: entering finally block")
-        rows = get_processing_state_metrics()
-        print(f"DEBUG: got {len(rows)} rows: {rows}")
-        push_processing_state_metrics(flow_name="orchestrator_flow", rows=rows)
-        print("DEBUG: push completed")
+        logger.info("Entering processing_state metrics push")
+        try:
+            rows = get_processing_state_metrics()
+            logger.info(f"Got {len(rows)} rows from processing_state", extra={"row_count": len(rows)})
+            push_processing_state_metrics(flow_name="orchestrator_flow", rows=rows)
+            logger.info("Processing_state metrics pushed successfully")
+        except Exception as e:
+            logger.error(f"Failed to push processing_state metrics: {e}")
 
 
 if __name__ == "__main__":
