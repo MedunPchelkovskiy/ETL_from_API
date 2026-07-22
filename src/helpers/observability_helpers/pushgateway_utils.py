@@ -163,3 +163,25 @@ def push_processing_state_metrics(
             errors.labels(flow_name, level, row["error_type"]).inc()
 
     push_to_gateway(pushgateway_url, job=f"{flow_name}_processing_state", registry=registry)
+
+
+
+def push_api_error_metrics(
+        api_name: str,
+        location: str,
+        error_type: str,
+        pushgateway_url: str = PUSHGATEWAY_URL
+    ):
+    registry = CollectorRegistry()
+
+    api_errors = Counter(
+        "api_errors_total",
+        "Total API call errors",
+        ["api_name", "location", "error_type"],  # error_type: "retryable" / "non_retryable" / "empty_response"
+        registry=registry
+    )
+
+    api_errors.labels(api_name, location, error_type).inc()
+
+    # Push metrics to Pushgateway
+    push_to_gateway(pushgateway_url, job="weather_pipeline", registry=registry)

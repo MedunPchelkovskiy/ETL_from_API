@@ -2,8 +2,8 @@ import time
 
 from requests import RequestException
 
-from src.helpers.observability_helpers.pushgateway_utils import push_api_metrics
 from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+from src.helpers.observability_helpers.pushgateway_utils import push_api_metrics, push_api_error_metrics
 
 
 def call_api_with_logging(api_func, *args, name=None, **kwargs):
@@ -26,6 +26,7 @@ def call_api_with_logging(api_func, *args, name=None, **kwargs):
                     "result": "empty",
                 }
             )
+            push_api_error_metrics(api_name=api_name, location=display_name, error_type="empty")
             raise RuntimeError(f"Empty response for {display_name}")
 
     except RequestException as e:
@@ -41,6 +42,7 @@ def call_api_with_logging(api_func, *args, name=None, **kwargs):
                 "retryable": True,
             }
         )
+        push_api_error_metrics(api_name=api_name, location=display_name, error_type="retryable")
         raise  # Prefect retry
 
     except Exception as e:
@@ -56,6 +58,7 @@ def call_api_with_logging(api_func, *args, name=None, **kwargs):
                 "retryable": False,
             }
         )
+        push_api_error_metrics(api_name=api_name, location=display_name, error_type="non-retryable")
         raise RuntimeError(f"Non-retryable error for {display_name}")
 
 
