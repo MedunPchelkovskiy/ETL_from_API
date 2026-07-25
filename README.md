@@ -97,6 +97,23 @@ prefect.yaml        Deployment and schedule configuration
 
 ---
 
+## Monitoring & Alerting
+
+  Implemented monitoring stack:
+
+  - Prometheus - metrics collection
+  - Grafana - dashboards and alert rules
+  - Slack - alert notifications
+  - Telegram - alert notifications
+
+  Features:
+    - ETL pipeline monitoring
+    - Custom Grafana dashboards
+    - Prometheus queries (PromQL)
+    - Alert rules for failures and delays
+    - Notification integrations
+---
+
 ## Status
 
 Core pipeline is stable and running on schedule. Grafana dashboards 
