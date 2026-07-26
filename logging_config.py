@@ -1,5 +1,6 @@
 import logging
 import logging.config
+import os
 from pathlib import Path
 
 LOG_DIR = Path("src/logs")
@@ -32,7 +33,7 @@ LOGGING_CONFIG = {
         "loki": {
             "class": "logging_loki.LokiHandler",
             "formatter": "json",
-            "url": "http://localhost:3100/loki/api/v1/push",
+            "url": os.getenv("LOKI_URL", "http://localhost:3100") + "/loki/api/v1/push",
             "tags": {"app": "etl-weather"},
             "version": "2",
             "level": "INFO",

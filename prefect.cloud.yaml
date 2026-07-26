@@ -1,12 +1,14 @@
 prefect-version: "3.*"
 name: etl_from_api_cloud
 
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: /app   # или каквото е WORKDIR в Dockerfile-а ти
+
 deployments:
   - name: Orchestrator-Deployment
     description: Cloud Prefect deployment for orchestrator flow
     entrypoint: src/flows/master/orchestrator_flow.py:orchestrator_flow
-    work_pool:
-      name: my-managed-pool
 
 
   - name: bronze-flow
@@ -16,8 +18,6 @@ deployments:
     parameters:
       debug: true
     concurrency_limit: 1
-    work_pool:
-      name: my-managed-pool
 
 
   - name: silver-flow
@@ -27,8 +27,6 @@ deployments:
     parameters:
       debug: true
     concurrency_limit: 1
-    work_pool:
-      name: my-managed-pool
 
 
   - name: gold-flow
@@ -38,16 +36,11 @@ deployments:
     parameters:
       debug: true
     concurrency_limit: 1
-    work_pool:
-      name: my-managed-pool
 
   - name: gold-daily-summ-flow
     description: Cloud Prefect deployment for gold daily summarized forecast flow
     entrypoint: src/flows/gold/daily_summ_agg_data.py:hourly_to_daily_aggregation
     tags: [ cloud, portfolio ]
-    work_pool:
-      name: my-managed-pool
-
 
 
 #  - name: gold-weekly-summ-flow
