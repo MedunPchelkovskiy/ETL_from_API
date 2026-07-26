@@ -1,0 +1,12 @@
+services:
+  weather-etl:
+    image: weather-etl:latest
+    container_name: weather-etl-test
+    env_file:
+      - .env.cloud
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    external: true
