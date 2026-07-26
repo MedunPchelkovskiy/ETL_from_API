@@ -1,3 +1,5 @@
+import config
+
 from prefect import flow, runtime
 from prefect.deployments import run_deployment
 

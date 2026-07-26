@@ -1,3 +1,4 @@
+import config as env_config
 import pendulum
 from decouple import config  # import configuration
 from prefect import flow
