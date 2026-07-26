@@ -1,0 +1,86 @@
+prefect-version: "3.*"
+name: etl_from_api_cloud
+
+deployments:
+  - name: Orchestrator-Deployment
+    description: Cloud Prefect deployment for orchestrator flow
+    entrypoint: src/flows/master/orchestrator_flow.py:orchestrator_flow
+    work_pool:
+      name: my-managed-pool
+
+
+  - name: bronze-flow
+    description: Cloud Prefect deployment for bronze layer
+    entrypoint: src/flows/bronze/extract_data_for_ski_resorts_in_Bulgaria_flow.py:weather_flow_run
+    tags: [cloud, portfolio]
+    parameters:
+      debug: true
+    concurrency_limit: 1
+    work_pool:
+      name: my-managed-pool
+
+
+  - name: silver-flow
+    description: Cloud Prefect deployment for silver layer
+    entrypoint: src/flows/silver/extract_bronze_data_flow.py:transform_bronze_data
+    tags: [ cloud, portfolio ]
+    parameters:
+      debug: true
+    concurrency_limit: 1
+    work_pool:
+      name: my-managed-pool
+
+
+  - name: gold-flow
+    description: Cloud Prefect deployment for gold forecast layer
+    entrypoint: src/flows/gold/daily_dataset_forecast.py:daily_forecast
+    tags: [ cloud, portfolio ]
+    parameters:
+      debug: true
+    concurrency_limit: 1
+    work_pool:
+      name: my-managed-pool
+
+  - name: gold-daily-summ-flow
+    description: Cloud Prefect deployment for gold daily summarized forecast flow
+    entrypoint: src/flows/gold/daily_summ_agg_data.py:hourly_to_daily_aggregation
+    tags: [ cloud, portfolio ]
+    work_pool:
+      name: my-managed-pool
+
+
+
+#  - name: gold-weekly-summ-flow
+#    description: Cloud Prefect deployment for gold weekly summarized forecast flow
+#    entrypoint: src/flows/gold/weekly_summ_agg_data.py:daily_to_weekly_aggregation
+#    schedule:
+#      cron: "5 0 * * 1"
+#      timezone: UTC
+#    tags: [ cloud, portfolio ]
+#    work_pool:
+#      name: cloud-dev-process
+
+
+#  - name: gold-monthly-summ-flow
+#    description: Cloud Prefect deployment for gold monthly summarized weather data flow
+#    entrypoint: src/flows/gold/monthly_summ_agg_data.py:daily_to_monthly_aggregation
+#    schedule:
+#      cron: "9 0 1 * *"
+#      timezone: UTC
+#    tags: [ cloud, portfolio ]
+#    work_pool:
+#      name: cloud-dev-process
+#
+#
+#  - name: gold-seasonal-summ-flow
+#    description: Cloud Prefect deployment for gold seasonally summarized weather data flow
+#    entrypoint: src/flows/gold/seasonally_agg_from_monthly.py:monthly_to_seasonally_aggregation
+#    schedule:
+#      cron: "9 0 1 3,6,9,12 *"
+#      timezone: UTC
+#    tags: [ cloud, portfolio ]
+#    work_pool:
+#      name: cloud-dev-process
+
+
+
