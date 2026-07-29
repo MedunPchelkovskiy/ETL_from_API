@@ -34,7 +34,7 @@ def load_raw_api_data_to_azure_blob(fs_client, base_dir, folder_name, file_name,
 
 @task
 @measure_task_duration(flow_name="bronze_flow", task_name="load_bronze_to_postgres", on_complete=push_task_metrics)
-def load_raw_api_data_to_postgres_local(data, label):
+def load_raw_api_data_to_postgres_local(data, label, now):
     logger = get_logger()
     logger.info("Start task loading raw data to Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,
@@ -42,7 +42,7 @@ def load_raw_api_data_to_postgres_local(data, label):
                        "label": label
                        }
                 )
-    load_raw_api_data_to_postgres(data, label)
+    load_raw_api_data_to_postgres(data, label, now)
     logger.info("Completed task loading raw data to Postgres local",
                 extra={"flow_run_id": runtime.flow_run.id,
                        "task_run_id": runtime.task_run.id,

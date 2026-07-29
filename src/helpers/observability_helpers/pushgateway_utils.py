@@ -3,6 +3,8 @@
 from decouple import config
 from prometheus_client import CollectorRegistry, Gauge, Counter, Histogram, push_to_gateway
 
+from src.helpers.logging_helpers.combine_loggers_helper import get_logger
+
 # Optional: configure Pushgateway URL via environment variable
 PUSHGATEWAY_URL = config("PUSHGATEWAY_URL", default="localhost:9091")
 
@@ -17,6 +19,7 @@ def push_metrics_to_gateway(flow_name: str, status: str, duration: float, pushga
       - Pipeline running status
     """
     registry = CollectorRegistry()
+    logger = get_logger()
 
     # Flow run counter (success / failed)
     flow_runs = Counter(
@@ -46,8 +49,10 @@ def push_metrics_to_gateway(flow_name: str, status: str, duration: float, pushga
     pipeline_running.labels(flow_name=flow_name).set(0)
 
     # Push metrics to Pushgateway
-    push_to_gateway(pushgateway_url, job=flow_name, registry=registry)
-
+    try:
+        push_to_gateway(pushgateway_url, job=flow_name, registry=registry)
+    except Exception as e:
+        logger.warning(f"Failed to push metrics to pushgateway: {e}")
 
 def push_task_metrics(
         flow_name: str,
@@ -63,6 +68,7 @@ def push_task_metrics(
       - Rows processed
     """
     registry = CollectorRegistry()
+    logger = get_logger()
 
     # Task duration
     task_duration = Histogram(
@@ -83,7 +89,10 @@ def push_task_metrics(
     # rows_processed.labels(flow_name, task_name).inc(rows)
 
     # Push metrics to Pushgateway
-    push_to_gateway(pushgateway_url, job=f"{flow_name}_{task_name}", registry=registry)
+    try:
+        push_to_gateway(pushgateway_url, job=f"{flow_name}_{task_name}", registry=registry)
+    except Exception as e:
+        logger.warning(f"Failed to push metrics to pushgateway: {e}")
 
 
 def push_api_metrics(
@@ -102,6 +111,7 @@ def push_api_metrics(
 
     """
     registry = CollectorRegistry()
+    logger = get_logger()
 
     # Task duration
     call_duration = Histogram(
@@ -113,7 +123,10 @@ def push_api_metrics(
     call_duration.labels(api_name, location).observe(duration)
 
     # Push metrics to Pushgateway
-    push_to_gateway(pushgateway_url, job="weather_pipeline", registry=registry)
+    try:
+        push_to_gateway(pushgateway_url, job="weather_pipeline", registry=registry)
+    except Exception as e:
+        logger.warning(f"Failed to push metrics to pushgateway: {e}")
 
 
 def push_processing_state_metrics(
@@ -122,6 +135,7 @@ def push_processing_state_metrics(
         pushgateway_url: str = PUSHGATEWAY_URL
 ):
     registry = CollectorRegistry()
+    logger = get_logger()
 
     completeness = Gauge(
         "etl_completeness_ratio",
@@ -162,7 +176,10 @@ def push_processing_state_metrics(
         if row["error_type"]:
             errors.labels(flow_name, level, row["error_type"]).inc()
 
-    push_to_gateway(pushgateway_url, job=f"{flow_name}_processing_state", registry=registry)
+    try:
+        push_to_gateway(pushgateway_url, job=f"{flow_name}_processing_state", registry=registry)
+    except Exception as e:
+        logger.warning(f"Failed to push metrics to pushgateway: {e}")
 
 
 
@@ -173,6 +190,7 @@ def push_api_error_metrics(
         pushgateway_url: str = PUSHGATEWAY_URL
     ):
     registry = CollectorRegistry()
+    logger = get_logger()
 
     api_errors = Counter(
         "api_errors_total",
@@ -184,4 +202,7 @@ def push_api_error_metrics(
     api_errors.labels(api_name, location, error_type).inc()
 
     # Push metrics to Pushgateway
-    push_to_gateway(pushgateway_url, job="weather_pipeline", registry=registry)
+    try:
+        push_to_gateway(pushgateway_url, job="weather_pipeline", registry=registry)
+    except Exception as e:
+        logger.warning(f"Failed to push metrics to pushgateway: {e}")

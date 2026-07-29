@@ -53,7 +53,7 @@ def weather_flow_run(debug: bool = False):
             # Upload JSON to Azure
             load_raw_api_data_to_azure_blob(fs_client, config("BASE_DIR_RAW"), folder_name, file_name, data["data"])
             # Upload JSON local to postgres
-            load_raw_api_data_to_postgres_local(data, label)
+            load_raw_api_data_to_postgres_local(data, label, now)
     logger.info(f"Running flow at {now}")
 
 
