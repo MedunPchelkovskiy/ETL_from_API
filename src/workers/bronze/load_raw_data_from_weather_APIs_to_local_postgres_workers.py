@@ -143,7 +143,9 @@ def load_raw_api_data_to_postgres(data, label, now):
 
     ingest_date = now
     ingest_hour = ingest_date.hour
-
+    logger.info(
+        f"DB_CONN_RAW starts with: {config('DB_CONN_RAW')[:30]}"
+    )
     try:
         with psycopg.connect(connection_string) as conn:
             with conn.cursor() as cur:
