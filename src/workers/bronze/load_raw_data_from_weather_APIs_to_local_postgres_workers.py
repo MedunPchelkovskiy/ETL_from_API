@@ -129,15 +129,13 @@ from src.helpers.logging_helpers.combine_loggers_helper import get_logger
 def load_raw_api_data_to_postgres(data, label, now):
     logger = get_logger()
 
-    username = config("DB_USER")
-    password = config("DB_PASSWORD")
-    host = config("DB_HOST")
-    port = config("DB_PORT")
-    database = config("DB_NAME_FOR_RAW_WEATHER_API_DATA")
+    # username = config("DB_USER")
+    # password = config("DB_PASSWORD")
+    # host = config("DB_HOST")
+    # port = config("DB_PORT")
+    # database = config("DB_NAME_FOR_RAW_WEATHER_API_DATA")
 
-    connection_string = (
-        f"postgresql://{username}:{password}@{host}:{port}/{database}"
-    )
+    connection_string = config("DB_CONN_RAW")
 
     source = data["api"]
     place_name = label
