@@ -161,9 +161,13 @@ cython_debug/
 .idea/
 etl.log
 
+
 # Terraform
 .terraform/
 *.tfstate
 *.tfstate.*
 terraform.tfvars
 .terraform.lock.hcl
+
+# Secrets — never commit the real file, only the .example template
+.env.secrets
