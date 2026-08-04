@@ -10,12 +10,12 @@ terraform {
 
   # State remotely (Azure Storage) preferred over local state once you have
   # more than one person/machine touching this. Local state is fine solo.
-  # backend "azurerm" {
-  #   resource_group_name  = "tfstate-rg"
-  #   storage_account_name = "yourtfstatestorage"
-  #   container_name       = "tfstate"
-  #   key                  = "weather-etl.tfstate"
-  # }
+  backend "azurerm" {
+    resource_group_name  = "portfolio-rg"
+    storage_account_name = "weatheretltfstate"
+    container_name       = "tfstate"
+    key                  = "weather-etl.tfstate"
+  }
 }
 
 provider "azurerm" {
