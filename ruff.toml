@@ -1,0 +1,4 @@
+[lint]
+select = []
+[lint.per-file-ignores]
+"*.py" = ["F401", "F841"]
