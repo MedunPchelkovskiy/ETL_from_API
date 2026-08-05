@@ -114,3 +114,7 @@ variable "pushgateway_memory" {
   type    = string
   default = "0.5Gi"
 }
+
+variable "admin_object_id" {
+  type = string
+}

@@ -64,3 +64,5 @@ jobs:
       - name: Terraform Apply
         working-directory: terraform
         run: terraform apply -auto-approve
+        env:
+          TF_VAR_admin_object_id: ${{ secrets.ADMIN_OBJECT_ID }}
